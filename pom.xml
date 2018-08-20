@@ -10,6 +10,7 @@
     <modules>
         <module>spring-eureka-server</module>
         <module>hello-service</module>
+        <module>ribbon-consumer</module>
     </modules>
     <packaging>pom</packaging>
 
