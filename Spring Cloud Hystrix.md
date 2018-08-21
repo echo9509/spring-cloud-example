@@ -12,3 +12,80 @@ Hystrix具备服务降级、服务熔断、线程和信号隔离、请求缓存�
 1. eureka-server工程: 服务注册中心，端口1111
 2. hello-service工程: HELLO-SERVICE服务单元，启动两个实例，端口分别为8081和8082
 3. ribbon-consumer工程: 使用Ribbon实现的服务消费者，端口9000
+
+## 修改ribbon-consumer模块
+### 修改pom.xml
+首先在pom.xml文件中增加spring-cloud-starter-hystrix依赖
+### 开启断路由器功能
+在ribbon-consumer主类中使用**@EnableCircuitBreaker**注解开启断路由器功能，在这里还有一个小技巧，可以使用**@SpringCloudApplicationd**代替@EnableCircuitBreaker、@EnableEurekaClient、@SpringBootApplication这三个注解。
+### 改造服务消费方式
+改造ribbon-consumer中的HelloService，如下
+```java
+package cn.sh.ribbon.service;
+
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * @author sh
+ */
+@Service
+public class HelloService {
+
+    private static final Logger logger = LoggerFactory.getLogger(HelloService.class);
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    /**
+     * 使用@HystrixCommand注解指定回调方法
+     * @param name
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "ribbonHelloFallback", commandKey = "helloKey")
+    public String ribbonHello(String name) {
+        long start = System.currentTimeMillis();
+        String result = restTemplate.getForObject("http://HELLO-SERVICE/hello?name=" + name, String.class);
+        long end = System.currentTimeMillis();
+        logger.info("Spend Time:" + (end - start));
+        return result;
+    }
+
+    public String ribbonHelloFallback() {
+        return "Hello, this is fallback";
+    }
+}
+
+```
+### 改造服务提供者
+改造hello-service模块中的HelloService.java，如下:
+```java
+package cn.sh.hello.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.Random;
+
+/**
+ * @author sh
+ */
+@Service
+public class HelloService {
+
+    private static final Logger logger = LoggerFactory.getLogger(HelloService.class);
+
+    public String hello(String name) throws InterruptedException {
+        int sleepTime = new Random().nextInt(3000);
+        logger.info("sleepTime:" + sleepTime);
+        Thread.sleep(sleepTime);
+        return "Hello, " + name;
+    }
+}
+```
+在服务提供者的改造中，我们会让方法阻塞几秒中返回内容，由于Hystrix默认的超时时间为2000ms，在这里产生0-3000的随机数可以让处理过程有一定概率触发断路由器。

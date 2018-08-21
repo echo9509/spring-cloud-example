@@ -16,7 +16,7 @@ public class HelloController {
     private HelloService helloService;
 
     @GetMapping("/hello")
-    public String hello(@RequestParam String name) {
+    public String hello(@RequestParam String name) throws InterruptedException {
         return helloService.hello(name);
     }
 }
