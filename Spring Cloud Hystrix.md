@@ -89,3 +89,14 @@ public class HelloService {
 }
 ```
 在服务提供者的改造中，我们会让方法阻塞几秒中返回内容，由于Hystrix默认的超时时间为2000ms，在这里产生0-3000的随机数可以让处理过程有一定概率触发断路由器。
+
+# 原理分析
+![工作流程图](https://s1.ax1x.com/2018/08/21/PIzdl6.png)
+下面根据工作流程图，我们来分析一下Hystrix是如何工作的。
+
+# 创建HystrixCommand或HystrixObservableCommand对象
+首先，构建一个HystrixCommand或HystrixObservableCommand对象，用来表示对依赖服务的操作请求，同时传递所有需要的参数。这两个对象都采用了命令模式来实现对服务调用操作的封装，但是这两个对象分别针对不同的应用场景。
+1. HystrixCommand: 用在依赖的服务返回单个操作结果的时候
+2. HystrixObservableCommand: 用在依赖的服务返回多个操作结果的时候
+
+命令模式，将来自客户端的请求封装成一个对象，从而让你可以使用不同的请求对客户端进行参数化。它可以用于实现行为请求者和行为实现者的解耦，以便使两者可以适应变化
