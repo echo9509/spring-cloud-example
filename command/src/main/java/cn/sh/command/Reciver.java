@@ -2,6 +2,7 @@ package cn.sh.command;
 
 /**
  * 接受者
+ * @author sh
  */
 public class Reciver {
 

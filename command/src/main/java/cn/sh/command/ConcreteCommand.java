@@ -2,6 +2,7 @@ package cn.sh.command;
 
 /**
  * 具体命令实现
+ * @author sh
  */
 public class ConcreteCommand implements Command {
 
