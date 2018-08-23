@@ -120,3 +120,31 @@ public class HelloService {
 ## 命令执行
 从图中我们可以看到一共存在4种命令的执行方式，Hystrix在执行时会根据创建的Command对象以及具体的情况来选择一个执行。
 
+**HystrixCommand**
+
+HystrixCommand实现了两个执行方式：
+1. execute(): 同步执行，从依赖的服务返回一个单一的结果对象，或是在错误时抛出异常
+2. queue(): 异步执行，直接返回一个Future对象，其中包含了服务执行结束时要返回的单一结果对象。
+
+```java
+R value = command.execute();
+Future<R> fValue = command.queue();
+```
+
+**HystrixObservableCommand**
+
+HystrixObservableCommand实现了另两种执行方式:
+1. observer(): 返回Observable对象，它代表了操作的多个结果，是一个HotObservable
+2. toObservable(): 同样返回Observable对象，也代表操作的多个结果，返回的是一个ColdObservable
+```java
+Observable<R> ohvalue = command.observe();
+Observable<R> ocvalue = command.toObservable();
+```
+### RxJava观察者-订阅者模式入门介绍
+在Hystrix的底层实现中大量使用了RxJava。上面提到的Observable对象就是RxJava的核心内容之一，可以把Observable对象理解为**事件源**或是**被观察者**，与其对应的是Subscriber对象，可以理解为**订阅者**或是**观察者**。
+
+1. Observable用来向订阅者Subscriber对象发布事件，Subscriber对象在接收到事件后对其进行处理，这里所指的事件通常就是对依赖服务的调用。
+2. 一个Observable可以发出多个事件，直到结束或是发生异常。
+3. Observable对象每发出一个事件，就会调用对应观察者Subscriber对象的onNext()方法。
+4. 每一个Observable的执行，最后一定会通过调用Subscriber.onCompleted()或是Subscriber.onError()来结束该事件的操作流。
+
