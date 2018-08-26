@@ -94,7 +94,7 @@ public class HelloService {
 ![工作流程图](https://s1.ax1x.com/2018/08/21/PIzdl6.png)
 下面根据工作流程图，我们来分析一下Hystrix是如何工作的。
 
-## 创建HystrixCommand或HystrixObservableCommand对象
+## 第1步 创建HystrixCommand或HystrixObservableCommand对象
 首先，构建一个HystrixCommand或HystrixObservableCommand对象，用来表示对依赖服务的操作请求，同时传递所有需要的参数。这两个对象都采用了命令模式来实现对服务调用操作的封装，但是这两个对象分别针对不同的应用场景。
 1. HystrixCommand: 用在依赖的服务返回单个操作结果的时候
 2. HystrixObservableCommand: 用在依赖的服务返回多个操作结果的时候
@@ -117,7 +117,7 @@ public class HelloService {
 3. 系统需要支持命令的撤销。命令对象可以把状态存储起来，等到客户端需要撤销命令所产生的效果时，可以调用undo()方法，把命令所产生的效果撤销掉。命令对象还提供redo()方法，以供客户端在需要时再重新实施命令效果。
 4. 如果要将系统中所有的数据更新到日志里，以便在系统崩溃时，可以根据日志读回所有的数据更新命令，重新调用execute()方法一条一条执行这些命令，从而恢复系统在崩溃前所做的数据更新。
 
-## 命令执行
+## 第2步 命令执行
 从图中我们可以看到一共存在4种命令的执行方式，Hystrix在执行时会根据创建的Command对象以及具体的情况来选择一个执行。
 
 **HystrixCommand**
@@ -140,6 +140,18 @@ HystrixObservableCommand实现了另两种执行方式:
 Observable<R> ohvalue = command.observe();
 Observable<R> ocvalue = command.toObservable();
 ```
+
+Hot Observable和Cold Observable，分别对应了上面command.observe()和command.toObservable的返回对象。
+
+Hot Observable，不论事件源是否有订阅者，都会在创建后对事件进行发布，所以对Hot Observable的每一个订阅者都有可能是从事件源的中途开始的，并可能只是看到了整个操作的局部过程。
+
+Cold Observable在没有订阅者的时候不会发布事件，而是进行等待，直到有订阅者后才会发布事件，所以对于Cold Observable的订阅者，它可以保证从一开始看到整个操作的全部过程。
+
+HystrixCommand也使用RxJava实现：
+1. execute():该方法是通过queue()返回的异步对象Future<R>的get()方法来实现同步执行的。该方法会等待任务执行结束，然后获得R类型的结果返回。
+2. queue():通过toObservable()获得一个Cold Observable，并且通过通过toBlocking()将该Observable转换成BlockingObservable，它可以把数据以阻塞的方式发出来，toFuture方法则是把BlockingObservable转换为一个Future，该方法只是创建一个Future返回，并不会阻塞，这使得消费者可以自己决定如何处理异步操作。execute()则是直接使用了queue()返回的Future中的阻塞方法get()来实现同步操作的。
+3. 通过这种方式转换的Future要求Observable只发射一个数据，所以这两个实现都只能返回单一结果。
+
 ### RxJava观察者-订阅者模式入门介绍
 在Hystrix的底层实现中大量使用了RxJava。上面提到的Observable对象就是RxJava的核心内容之一，可以把Observable对象理解为**事件源**或是**被观察者**，与其对应的是Subscriber对象，可以理解为**订阅者**或是**观察者**。
 
@@ -148,3 +160,15 @@ Observable<R> ocvalue = command.toObservable();
 3. Observable对象每发出一个事件，就会调用对应观察者Subscriber对象的onNext()方法。
 4. 每一个Observable的执行，最后一定会通过调用Subscriber.onCompleted()或是Subscriber.onError()来结束该事件的操作流。
 
+## 第3步 结果是否被缓存
+若当前命令的请求缓存功能是被启用的，并且该命令缓存命中，那么缓存的结果会立即以Observable对象的形式返回。
+
+## 第4步 断路由器是否打开
+在命令结果没有缓存命中的时候，Hystrix在执行命令前需要检查断路由器是否为打开状态:
+1. 如果断路由器是打开的，Hystrix不会执行命令，而是直接赚到fallback处理逻辑(对应下面第8步)
+2. 如果断路由器是关闭的，那么Hystrix会跳到第5步，检查是否有可用资源来执行命令。
+
+## 第5步 线程池/请求队列/信号量是否占满
+如果与命令相关的线程池和请求队列或者信号量(不使用线程池的时候)已被占满，那么Hystrix不会执行命令，转接到fallback处理逻辑(对应下面第8步)
+
+Hystrix所判断的线程池并非容器的线程池，而是每个依赖服务的专有线程池。Hystrix为了保证不会因为某个依赖服务的问题影响到其他依赖服务而采用了舱壁模式来隔离每个依赖的服务。
