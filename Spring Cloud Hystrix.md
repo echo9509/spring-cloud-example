@@ -186,3 +186,33 @@ Hystrix会根据我们编写的方法来决定采取什么样的方式去请求�
 Hystrix会将成功、失败、拒绝、超时等信息报告给断路器，断路器会维护一组计数器来统计这些数据。
 
 断路器会使用这些统计数据来决定是否要将断路器打开，来对某个依赖服务的请求进行熔断/短路，直到恢复期结束。若在恢复期结束后，根据统计数据判断如果还是未达到健康指标，就再次熔断/短路。
+
+## 第8步 fallback处理
+当命令执行失败时，Hystrix会进入fallback尝试回退处理，我们通常也称之为**服务降级**。能够引起服务降级处理的情况主要有以下几种:
+1. 第4步，当前命令处于熔断/短路状态，断路器是打开的时候。
+2. 第5步，当前命令的线程池、请求队列或者信号量被占满的时候。
+3. 第6步，HystrixObservableCommand.construct()或HystrixCommand.run()抛出异常的时候。
+
+在服务降级逻辑中，我们需要实现一个通用的响应结果，并且该结果的处理逻辑应当是从缓存或是根据一些静态逻辑来获取，而不是依赖网络请求获取。如果一定要在降级逻辑中包含网络请求，那么该请求也必须被包装在HystrixCommand或是HystrixObservableCommand中，从而形成级联的降级策略，而最终的降级逻辑一定不是一个依赖网络请求的处理，而是一个能够稳定返回结果的处理逻辑。
+
+HystrixCommand和HystrixObservableCommand中实现降级逻辑时有以下不同:
+1. 当使用HystrixCommand的时候，通过实现HystrixCommand.getFallback()来实现服务降级逻辑。
+2. 当使用HystrixObservableCommand的时候，通过HystrixObservableCommand.resumeWithFallback()实现服务降级逻辑，该方法会返回一个Observable对象来发射一个或多个降级结果。
+
+当命令的降级逻辑返回结果之后，Hystrix就将该结果返回给调用者。当使用HystrixCommand.getFallback()时候，它会返回一个Observable对象，该对象会发射getFallback()的处理结果。而使用HystrixObservableCommand.resumeWithFallback()实现的时候，它会将Observable对象直接返回。
+
+如果我们没有为命令实现降级逻辑或在降级处理中抛出了异常，Hystrix依然会返回一个Observable对象，但是他不会发射任何结果数据，而是通过onError方法通知命令立即中断请求，并通过onError()方法将引起命令失败的异常发送给调用者。在降级策略的实现中我们应尽可能避免失败的情况。
+
+如果在执行降级时发生失败，Hystrix会根据不同的执行方法作出不同的处理:
+1. execute(): 抛出异常
+2. queue(): 正常返回Future对象，但是调用get()来获取结果时会抛出异常
+3. observe(): 正常返回Observable对象，当订阅它的时候，将立即通过订阅者的onError方法来通知中止请求
+4. toObservable(): 正常返回Observable对象，当订阅它的时候，将通过调用订阅者的onError方法来通知中止请求
+
+## 第9步 返回成功的响应
+当Hystrix命令执行成功之后，它会将处理结果直接返回或是以Observable的形式返回。具体的返回形式取决于不同的命令执行方式。
+![返回结果](https://s1.ax1x.com/2018/08/27/PLNImQ.png)
+1. toObservable(): 返回原始的Observable，必须通过订阅它才会真正触发命令的执行流程
+2. observe(): 在toObservable()产生原始Observable之后立即订阅它，让命令能够马上开始异步执行，并返回一个Observable对象，当调用它的subscribe时，将重新产生结果和通知给订阅者。
+3. queue(): 将toObservable()产生的原始Observable通过toBlocking()方法转换成BlockingObservable对象，并调用它的toFuture()方法返回异步的Future对象
+4. execute(): 在queue()产生异步结果Future对象之后，通过调用get()方法阻塞并等待结果的返回。
