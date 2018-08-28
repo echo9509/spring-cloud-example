@@ -216,3 +216,144 @@ HystrixCommand和HystrixObservableCommand中实现降级逻辑时有以下不同
 2. observe(): 在toObservable()产生原始Observable之后立即订阅它，让命令能够马上开始异步执行，并返回一个Observable对象，当调用它的subscribe时，将重新产生结果和通知给订阅者。
 3. queue(): 将toObservable()产生的原始Observable通过toBlocking()方法转换成BlockingObservable对象，并调用它的toFuture()方法返回异步的Future对象
 4. execute(): 在queue()产生异步结果Future对象之后，通过调用get()方法阻塞并等待结果的返回。
+
+# 断路器原理
+断路器在HystrixCommand和HystrixObservableCommand执行过程中起到至关重要的作用。查看一下核心组件HystrixCircuitBreaker
+```java
+package com.netflix.hystrix;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+import com.netflix.hystrix.HystrixCommandMetrics.HealthCounts;
+import rx.Subscriber;
+import rx.Subscription;
+
+public interface HystrixCircuitBreaker {
+
+    boolean allowRequest();
+    
+    boolean isOpen();
+
+    void markSuccess();
+
+    void markNonSuccess();
+
+    boolean attemptExecution();
+
+    class Factory {
+        // String is HystrixCommandKey.name() (we can't use HystrixCommandKey directly as we can't guarantee it implements hashcode/equals correctly)
+        private static ConcurrentHashMap<String, HystrixCircuitBreaker> circuitBreakersByCommand = new ConcurrentHashMap<String, HystrixCircuitBreaker>();
+    }
+
+
+    class HystrixCircuitBreakerImpl implements HystrixCircuitBreaker {
+    }
+
+    static class NoOpCircuitBreaker implements HystrixCircuitBreaker {
+    }
+
+}
+```
+下面先看一下该接口的抽象方法：
+1. allowRequest(): 每个Hystrix命令的请求都通过它判断是否被执行(已经不再使用,使用attemptExecution()方法进行判断)
+2. attemptExecution(): 每个Hystrix命令的请求都通过它判断是否被执行
+3. isOpen(): 返回当前断路器是否打开
+4. markSuccess(): 用来关闭断路器
+5. markNonSuccess: 用来打开断路器
+
+下面看一下该接口中的类:
+1. Factory: 维护了一个Hystrix命令和HystrixCircuitBreaker的关系的集合ConcurrentHashMap<String, HystrixCircuitBreaker> circuitBreakersByCommand。其中key通过HystrixCommandKey来定义，每一个Hystrix命令都需要有一个Key来标识，同时根据这个Key可以找到对应的断路器实例。
+2. NoOpCircuitBreaker: 一个啥都不做的断路器，它允许所有请求通过，并且断路器始终处于闭合状态
+3. HystrixCircuitBreakerImpl:断路器的另一个实现类。
+
+## HystrixCircuitBreakerImpl介绍
+在该类中定义了断路器的五个核心对象:
+1. HystrixCommandProperties properties:断路器对应实例的属性集合对象
+2. HystrixCommandMetrics metrics:用来让HystrixCommand记录各类度量指标的对象
+3. AtomicReference<Status> status: 用来记录断路器的状态，默认是关闭状态
+4. AtomicLong circuitOpened:断路器打开的时间戳，默认-1，表示断路器未打开
+5. AtomicReference<Subscription> activeSubscription: 记录HystrixCommand
+
+
+### isOpen方法介绍
+```java
+        @Override
+        public boolean isOpen() {
+            if (properties.circuitBreakerForceOpen().get()) {
+                return true;
+            }
+            if (properties.circuitBreakerForceClosed().get()) {
+                return false;
+            }
+            return circuitOpened.get() >= 0;
+        }
+```
+用来判断断路器是否打开或关闭。主要步骤有：
+1. 如果断路器强制打开，返回true
+2. 如果断路器强制关闭，返回false
+3. 判断circuitOpened的值，如果大于等于0，返回true, 否则返回false
+
+### attemptExecution方法介绍
+```java
+        private boolean isAfterSleepWindow() {
+            final long circuitOpenTime = circuitOpened.get();
+            final long currentTime = System.currentTimeMillis();
+            final long sleepWindowTime = properties.circuitBreakerSleepWindowInMilliseconds().get();
+            return currentTime > circuitOpenTime + sleepWindowTime;
+        }
+
+        @Override
+        public boolean attemptExecution() {
+            if (properties.circuitBreakerForceOpen().get()) {
+                return false;
+            }
+            if (properties.circuitBreakerForceClosed().get()) {
+                return true;
+            }
+            if (circuitOpened.get() == -1) {
+                return true;
+            } else {
+                if (isAfterSleepWindow()) {
+                    if (status.compareAndSet(Status.OPEN, Status.HALF_OPEN)) {
+                        //only the first request after sleep window should execute
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        }
+```
+该方法的主要逻辑有以下几步:
+1. 如果断路器强制打开，返回false，不允许放过请求
+2. 如果断路器强制关闭，返回true，允许放过请求
+3. 如果断路器是关闭状态，返回true，允许放过请求
+4. 判断当前时间是否超过断路器打开的时间加上滑动窗口的时间，如果没有超过，返回false，不允许放过请求
+5. 如果没有超过，如果断路器是打开状态，并且设置断路器状态为半开状态成功时，返回true，允许放过请求
+6. 如果失败，则返回false，不允许放过请求
+
+### markSuccess方法
+```java
+        @Override
+        public void markSuccess() {
+            if (status.compareAndSet(Status.HALF_OPEN, Status.CLOSED)) {
+                //This thread wins the race to close the circuit - it resets the stream to start it over from 0
+                metrics.resetStream();
+                Subscription previousSubscription = activeSubscription.get();
+                if (previousSubscription != null) {
+                    previousSubscription.unsubscribe();
+                }
+                Subscription newSubscription = subscribeToStream();
+                activeSubscription.set(newSubscription);
+                circuitOpened.set(-1L);
+            }
+        }
+```
+该方法主要用来关闭断路器，主要逻辑有以下几步：
+1. 如果断路器状态是半开并且成功设置为关闭状态时，执行以下步骤。
+2. 重置度量指标对象
+3. 
