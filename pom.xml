@@ -12,6 +12,8 @@
         <module>hello-service</module>
         <module>ribbon-consumer</module>
         <module>command</module>
+        <module>user-service</module>
+        <module>common</module>
     </modules>
     <packaging>pom</packaging>
 

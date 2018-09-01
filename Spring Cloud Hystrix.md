@@ -397,3 +397,167 @@ HystrixCommand和HystrixObservableCommand中有两处支持信号量的使用：
 2. 降级逻辑：当Hysrtix尝试降级逻辑时，它会在调用线程中使用信号量。
 
 信号量的默认值是10，我们可以通过动态刷新配置的方式来控制并发线程的数量。
+
+# 使用详解
+主要介绍Hystrix各接口和注解的使用方法。
+
+## 创建请求命令
+Hystrix命令就是我们之前所说的HystrixCommand，他用来封装具体的依赖服务调用逻辑。
+
+## 继承方式实现HystrixCommand
+首先通过代码实现HystrixCommand
+```java
+package cn.sh.ribbon.command;
+
+import cn.sh.common.entity.User;
+import com.netflix.hystrix.HystrixCommand;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * @author sh
+ */
+public class UserCommand extends HystrixCommand<User> {
+
+    private RestTemplate restTemplate;
+
+    private Long id;
+
+    public UserCommand(Setter setter, RestTemplate restTemplate, Long id) {
+        super(setter);
+        this.restTemplate = restTemplate;
+        this.id = id;
+    }
+    
+    @Override
+    protected User run() throws Exception {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+
+}
+```
+通过上面实现的UserCommand，我们即可以实现请求的同步执行也可以实现异步执行，相关代码如下：
+```java
+package cn.sh.ribbon.service;
+
+import cn.sh.common.entity.User;
+import cn.sh.ribbon.command.UserCommand;
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+
+/**
+ * @author sh
+ */
+@Service
+public class HelloService {
+
+    private static final Logger logger = LoggerFactory.getLogger(HelloService.class);
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    /**
+     * 第一种使用命令的方式
+     * @param id
+     * @return
+     */
+    public User getUserById(Long id) {
+        HystrixCommandGroupKey groupKey = HystrixCommandGroupKey.Factory.asKey("userKey");
+        com.netflix.hystrix.HystrixCommand.Setter setter = com.netflix.hystrix.HystrixCommand.Setter.withGroupKey(groupKey);
+        UserCommand userCommand = new UserCommand(setter, restTemplate, id);
+        // 同步执行获取结果
+//        return userCommand.execute();
+        // 异步执行获取结果
+        Future<User> future = userCommand.queue();
+        try {
+            return future.get();
+        } catch (Exception e) {
+            logger.info("获取结果发生异常", e);
+        }
+        return null;
+    }
+
+}
+```
+
+## 注解方式使用HystrixCommand
+通过HystrixCommand注解可以更优雅的实现Hystrix命令的定义，如下：
+```java
+package cn.sh.ribbon.service;
+
+import cn.sh.common.entity.User;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * @author sh
+ */
+@Service
+public class HelloService {
+
+    private static final Logger logger = LoggerFactory.getLogger(HelloService.class);
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    /**
+     * 通过注解方式获取User
+     * @param id
+     * @return
+     */
+    @HystrixCommand
+    public User findUserById(Long id) {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+}
+```
+上述代码虽然可以优雅的实现Hystrix命令，但是上述获取User的方式只是同步执行的实现，如果需要实现异步执行则需要进行如下改造:
+```java
+package cn.sh.ribbon.service;
+
+import cn.sh.common.entity.User;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.command.AsyncResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * @author sh
+ */
+@Service
+public class HelloService {
+
+    private static final Logger logger = LoggerFactory.getLogger(HelloService.class);
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    /**
+     * 通过注解方式异步执行获取User
+     * @param id
+     * @return
+     */
+    @HystrixCommand
+    public Future<User> asyncFindUserFutureById(Long id) {
+        return new AsyncResult<User>() {
+            @Override
+            public User invoke() {
+                return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+            }
+        };
+    }
+}
+```

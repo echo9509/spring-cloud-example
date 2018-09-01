@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>ribbon-consumer</artifactId>
+    <artifactId>user-service</artifactId>
 
     <dependencies>
         <!--增加Web支持-->
@@ -31,30 +31,10 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!--增加Ribbon支持-->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-ribbon</artifactId>
-            <version>1.2.5.RELEASE</version>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-netflix-ribbon</artifactId>
-            <version>2.0.0.RELEASE</version>
-        </dependency>
-
-        <!--增加spring-cloud-starter-hystrix依赖-->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-hystrix</artifactId>
-            <version>1.4.5.RELEASE</version>
-        </dependency>
-
         <dependency>
             <groupId>cn.sh.eureka</groupId>
             <artifactId>common</artifactId>
             <version>1.0</version>
         </dependency>
     </dependencies>
-
 </project>
