@@ -31,4 +31,9 @@ public class HelloController {
         // 使用注解命令方式异步调用服务
         return helloService.asyncFindUserById(id);
     }
+
+    @GetMapping("/observable/users/{id}")
+    public User observableGetUserById(@PathVariable Long id) {
+        return helloService.observableGetUserById(id);
+    }
 }

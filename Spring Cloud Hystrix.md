@@ -526,6 +526,8 @@ public class HelloService {
 package cn.sh.ribbon.service;
 
 import cn.sh.common.entity.User;
+import cn.sh.ribbon.command.UserCommand;
+import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.netflix.hystrix.contrib.javanica.command.AsyncResult;
 import org.slf4j.Logger;
@@ -533,6 +535,124 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import rx.Observable;
+import rx.Subscription;
+import rx.functions.Action1;
+
+import java.util.concurrent.Future;
+
+/**
+ * @author sh
+ */
+@Service
+public class HelloService {
+
+    private static final Logger logger = LoggerFactory.getLogger(HelloService.class);
+
+    @Autowired
+    private RestTemplate restTemplate;
+    
+    /**
+     * 通过注解方式异步执行获取User
+     * @param id
+     * @return
+     */
+    public User asyncFindUserById(Long id) {
+        AsyncResult<User> userFuture = asyncFindUserFutureById(id);
+        try {
+            return userFuture.invoke();
+        } catch (Exception e) {
+            logger.error("获取结果发生异常", e);
+        }
+        return null;
+    }
+
+    /**
+     * 通过注解方式异步执行获取User
+     * @param id
+     * @return
+     */
+    @HystrixCommand
+    public AsyncResult<User> asyncFindUserFutureById(Long id) {
+        return new AsyncResult<User>() {
+            @Override
+            public User invoke() {
+                return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+            }
+        };
+    }
+}
+```
+
+## 响应执行
+除了传统的同步执行与异步执行之外，我们还可以将HystrixCommand通过Observable来实现响应式执行方式。通过调用observe()和toObservable()可以返回Observable对象， 如下:
+```java
+Observable<User> observe = userCommand.observe();
+Observable<User> observe = userCommand.toObservable();
+```
+前者返回的是一个Hot Observable，该命令会在observe调用的时候立即执行，当Observable每次被订阅的时候都会重放它的行为。
+
+后者返回的是一个Cold Observable，toObservable()执行之后，命令不会被立即执行，只有当所有订阅者都订阅他之后才会执行。
+
+HystrixCommand具备了observe()和toObservable()的功能，但是它的实现有一定的局限性，它返回的Observable只能发射一次数据，所以Hystrix提供了另外的一个特殊命令封装HysrtixObservableCommand，通过命令可以发射多次的Observable
+
+## 响应执行自定义命令
+相关代码如下:
+```java
+package cn.sh.ribbon.command;
+
+import cn.sh.common.entity.User;
+import com.netflix.hystrix.HystrixObservableCommand;
+import org.springframework.web.client.RestTemplate;
+import rx.Observable;
+
+/**
+ * @author sh
+ */
+public class UserObservableCommand extends HystrixObservableCommand<User> {
+
+    private RestTemplate restTemplate;
+
+    private Long id;
+
+    public UserObservableCommand (Setter setter, RestTemplate restTemplate, Long id) {
+        super(setter);
+        this.restTemplate = restTemplate;
+        this.id = id;
+    }
+
+    @Override
+    protected Observable<User> construct() {
+        return Observable.create(subscriber -> {
+            if (!subscriber.isUnsubscribed()) {
+                User user = restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+                subscriber.onNext(user);
+                subscriber.onCompleted();
+            }
+        });
+    }
+}
+```
+## 响应执行使用注解@HystrixCommand
+相关代码如下：
+```java
+package cn.sh.ribbon.service;
+
+import cn.sh.common.entity.User;
+import cn.sh.ribbon.command.UserCommand;
+import cn.sh.ribbon.command.UserObservableCommand;
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.command.AsyncResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import rx.Observable;
+import rx.Observer;
+import rx.Subscriber;
+import rx.Subscription;
 
 /**
  * @author sh
@@ -546,18 +666,23 @@ public class HelloService {
     private RestTemplate restTemplate;
 
     /**
-     * 通过注解方式异步执行获取User
+     * 使用注解实现响应式命令
      * @param id
      * @return
      */
     @HystrixCommand
-    public Future<User> asyncFindUserFutureById(Long id) {
-        return new AsyncResult<User>() {
-            @Override
-            public User invoke() {
-                return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    public Observable<User> observableGetUserId(Long id) {
+        return Observable.create(subscriber -> {
+            if (!subscriber.isUnsubscribed()) {
+                User user = restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+                subscriber.onNext(user);
+                subscriber.onCompleted();
             }
-        };
+        });
     }
+
 }
 ```
+使用@HystrixCommand注解实现响应式命令，可以通过observableExecutionMode参数来控制是使用observe()还是toObservable()的执行方式。该参数有下面两种设置方式：
+1. @HystrixCommand(observableExecutionMode = ObservableExecutionMode.EAGER): EAGER是该参数的模式值，表示使用observe()执行方式。
+2. @HystrixCommand(observableExecutionMode = ObservableExecutionMode.LAZY): 表示使用toObservable()执行方式。

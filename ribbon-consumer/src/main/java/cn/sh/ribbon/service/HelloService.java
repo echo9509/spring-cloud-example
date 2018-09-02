@@ -2,14 +2,21 @@ package cn.sh.ribbon.service;
 
 import cn.sh.common.entity.User;
 import cn.sh.ribbon.command.UserCommand;
+import cn.sh.ribbon.command.UserObservableCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.ObservableExecutionMode;
 import com.netflix.hystrix.contrib.javanica.command.AsyncResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import rx.Observable;
+import rx.Observer;
+import rx.Subscriber;
+import rx.Subscription;
+import rx.functions.Action1;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -105,4 +112,61 @@ public class HelloService {
             }
         };
     }
+
+    /**
+     * 通过响应方式执行命令
+     * @param id
+     * @return
+     */
+    public User observableGetUserById(Long id) {
+        HystrixCommandGroupKey groupKey = HystrixCommandGroupKey.Factory.asKey("userKey");
+        com.netflix.hystrix.HystrixCommand.Setter setter = com.netflix.hystrix.HystrixCommand.Setter.withGroupKey(groupKey);
+        UserCommand userCommand = new UserCommand(setter, restTemplate, id);
+        Observable<User> observe = userCommand.toObservable();
+        observe.subscribe();
+        final User[] observeUser = {null};
+        observe.subscribe(new Observer<User>() {
+            @Override
+            public void onCompleted() {
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+
+            }
+
+            @Override
+            public void onNext(User user) {
+                observeUser[0] = user;
+            }
+        });
+        return observeUser[0];
+    }
+
+    public User observableCommandGetUserById(Long id) {
+        HystrixCommandGroupKey groupKey = HystrixCommandGroupKey.Factory.asKey("userKey");
+        com.netflix.hystrix.HystrixObservableCommand.Setter setter = com.netflix.hystrix.HystrixObservableCommand.Setter.withGroupKey(groupKey);
+        UserObservableCommand userObservableCommand = new UserObservableCommand(setter, restTemplate ,id);
+//        userObservableCommand.
+        return null;
+    }
+
+    /**
+     * 使用注解实现响应式命令
+     * @param id
+     * @return
+     */
+    @HystrixCommand
+//    @HystrixCommand(observableExecutionMode = ObservableExecutionMode.EAGER)
+//    @HystrixCommand(observableExecutionMode = ObservableExecutionMode.LAZY)
+    public Observable<User> observableGetUserId(Long id) {
+        return Observable.create(subscriber -> {
+            if (!subscriber.isUnsubscribed()) {
+                User user = restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+                subscriber.onNext(user);
+                subscriber.onCompleted();
+            }
+        });
+    }
+
 }
