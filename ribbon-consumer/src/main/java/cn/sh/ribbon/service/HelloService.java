@@ -75,10 +75,11 @@ public class HelloService {
 
     /**
      * 通过注解方式同步执行获取User
+     * 注解方式服务降级
      * @param id
      * @return
      */
-    @HystrixCommand
+    @HystrixCommand(fallbackMethod = "getDefaultUser")
     public User findUserById(Long id) {
         return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
     }
@@ -122,32 +123,14 @@ public class HelloService {
         HystrixCommandGroupKey groupKey = HystrixCommandGroupKey.Factory.asKey("userKey");
         com.netflix.hystrix.HystrixCommand.Setter setter = com.netflix.hystrix.HystrixCommand.Setter.withGroupKey(groupKey);
         UserCommand userCommand = new UserCommand(setter, restTemplate, id);
-        Observable<User> observe = userCommand.toObservable();
-        observe.subscribe();
-        final User[] observeUser = {null};
-        observe.subscribe(new Observer<User>() {
-            @Override
-            public void onCompleted() {
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-
-            }
-
-            @Override
-            public void onNext(User user) {
-                observeUser[0] = user;
-            }
-        });
-        return observeUser[0];
+        Observable<User> userObservable = userCommand.toObservable();
+        return null;
     }
 
     public User observableCommandGetUserById(Long id) {
         HystrixCommandGroupKey groupKey = HystrixCommandGroupKey.Factory.asKey("userKey");
         com.netflix.hystrix.HystrixObservableCommand.Setter setter = com.netflix.hystrix.HystrixObservableCommand.Setter.withGroupKey(groupKey);
         UserObservableCommand userObservableCommand = new UserObservableCommand(setter, restTemplate ,id);
-//        userObservableCommand.
         return null;
     }
 
@@ -167,6 +150,14 @@ public class HelloService {
                 subscriber.onCompleted();
             }
         });
+    }
+
+
+    private User getDefaultUser() {
+        User user = new User();
+        user.setId(2L);
+        user.setName("sh");
+        return user;
     }
 
 }

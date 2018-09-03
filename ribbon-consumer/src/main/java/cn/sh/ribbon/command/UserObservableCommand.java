@@ -30,4 +30,16 @@ public class UserObservableCommand extends HystrixObservableCommand<User> {
             }
         });
     }
+
+    @Override
+    protected Observable<User> resumeWithFallback() {
+        Observable<User> userObservable = Observable.create(subscriber -> {
+            User user = new User();
+            user.setId(1L);
+            user.setName("sh");
+            subscriber.onNext(user);
+            subscriber.onCompleted();
+        });
+        return userObservable;
+    }
 }

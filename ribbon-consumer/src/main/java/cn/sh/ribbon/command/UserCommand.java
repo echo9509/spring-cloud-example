@@ -24,4 +24,11 @@ public class UserCommand extends HystrixCommand<User> {
         return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
     }
 
+    @Override
+    protected User getFallback() {
+        User user = new User();
+        user.setId(1L);
+        user.setName("sh");
+        return user;
+    }
 }

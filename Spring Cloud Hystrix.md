@@ -686,3 +686,98 @@ public class HelloService {
 使用@HystrixCommand注解实现响应式命令，可以通过observableExecutionMode参数来控制是使用observe()还是toObservable()的执行方式。该参数有下面两种设置方式：
 1. @HystrixCommand(observableExecutionMode = ObservableExecutionMode.EAGER): EAGER是该参数的模式值，表示使用observe()执行方式。
 2. @HystrixCommand(observableExecutionMode = ObservableExecutionMode.LAZY): 表示使用toObservable()执行方式。
+
+# 定义服务降级
+fallback是Hystrix命令执行失败时使用的后备方法，用来实现服务的降级处理逻辑。在HystrixCommand中可以通过重载getFallback()方法来实现服务降级逻辑，Hystrix会在run()执行过程中出现错误、超时、线程池拒绝、断路器熔断等情况时，执行getFallback()方法内的逻辑。
+
+## 继承HystrixCommand实现getFallback
+```java
+package cn.sh.ribbon.command;
+
+import cn.sh.common.entity.User;
+import com.netflix.hystrix.HystrixCommand;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * @author sh
+ */
+public class UserCommand extends HystrixCommand<User> {
+
+    private RestTemplate restTemplate;
+
+    private Long id;
+
+    public UserCommand(Setter setter, RestTemplate restTemplate, Long id) {
+        super(setter);
+        this.restTemplate = restTemplate;
+        this.id = id;
+    }
+
+    @Override
+    protected User run() throws Exception {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+
+    @Override
+    protected User getFallback() {
+        User user = new User();
+        user.setId(1L);
+        user.setName("sh");
+        return user;
+    }
+}
+```
+在HystrixObservableCommand实现的Hystrix命令中，我们可以通过重载resumeWithFallback来实现降级逻辑。该方法会返回一个Observable对象，当命令执行失败的时候，Hystrix会将Observable中的结果通知给所有的订阅者。
+
+## 使用注解方式执行服务降级
+```java
+package cn.sh.ribbon.service;
+
+import cn.sh.common.entity.User;
+import cn.sh.ribbon.command.UserCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+/**
+ * @author sh
+ */
+@Service
+public class HelloService {
+
+    private static final Logger logger = LoggerFactory.getLogger(HelloService.class);
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    /**
+     * 通过注解方式同步执行获取User
+     * 注解方式服务降级
+     * @param id
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "getDefaultUser")
+    public User findUserById(Long id) {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+
+    private User getDefaultUser() {
+        User user = new User();
+        user.setId(2L);
+        user.setName("sh");
+        return user;
+    }
+
+}
+```
+在使用注解来定义服务降级时，需要将具体的Hystrix命令与fallback实现函数定义在同一个类中，并且fallbacMethod的值必须与实现fallback方法的名字相同。
+
+由于必须定义在一个类中，所以对于fallback的访问修饰符没有特定的要求，定义为private、protected、public均可。
+
+上述代码中若getDefaultUser方法实现不是一个稳定逻辑，那我们也可以为它添加@HystrixCommand注解来生成Hystrix命令，同时使用fallbackMethod来指定服务降级逻辑。
+
+在实际使用时，有一些情况可以不去实现降级逻辑，如：
+1. 执行写操作的命令: 当Hystrix命令是用来执行写操作而不是返回一些信息的时候，实现服务降级逻辑的意义不是很大。当写入失败时，我们通常只需要通知调用者即可。
+2. 执行批处理或离线计算命令: 当Hystrix命令是用来执行批处理程序生成一份报告或是进行任何类型的离线计算时，通常这些操作只需要将错误传播给调用者，然后让调用者稍后重试而不是发送给调用者一个静默的降级处理响应。
