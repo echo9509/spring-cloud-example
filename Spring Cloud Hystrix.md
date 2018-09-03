@@ -557,23 +557,8 @@ public class HelloService {
      * @param id
      * @return
      */
-    public User asyncFindUserById(Long id) {
-        AsyncResult<User> userFuture = asyncFindUserFutureById(id);
-        try {
-            return userFuture.invoke();
-        } catch (Exception e) {
-            logger.error("获取结果发生异常", e);
-        }
-        return null;
-    }
-
-    /**
-     * 通过注解方式异步执行获取User
-     * @param id
-     * @return
-     */
     @HystrixCommand
-    public AsyncResult<User> asyncFindUserFutureById(Long id) {
+    public Future<User> asyncFindUserFutureById(Long id) {
         return new AsyncResult<User>() {
             @Override
             public User invoke() {
@@ -583,6 +568,7 @@ public class HelloService {
     }
 }
 ```
+
 
 ## 响应执行
 除了传统的同步执行与异步执行之外，我们还可以将HystrixCommand通过Observable来实现响应式执行方式。通过调用observe()和toObservable()可以返回Observable对象， 如下:

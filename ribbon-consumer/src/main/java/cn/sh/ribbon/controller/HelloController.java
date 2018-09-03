@@ -7,6 +7,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import rx.Observable;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /**
  * @author sh
@@ -23,17 +27,13 @@ public class HelloController {
     }
 
     @GetMapping("/users/{id}")
-    public User getUserById(@PathVariable Long id) {
+    public User getUserById(@PathVariable Long id) throws ExecutionException, InterruptedException {
         // 使用命令方式调用服务
 //        return helloService.getUserById(id);
         // 使用注解命令方式同步调用服务
 //        return helloService.findUserById(id);
         // 使用注解命令方式异步调用服务
-        return helloService.asyncFindUserById(id);
-    }
-
-    @GetMapping("/observable/users/{id}")
-    public User observableGetUserById(@PathVariable Long id) {
-        return helloService.observableGetUserById(id);
+        Future<User> userFuture = helloService.asyncFindUserFutureById(id);
+        return userFuture.get();
     }
 }
