@@ -57,9 +57,7 @@ public class HelloService {
      * @return
      */
     public User getUserById(Long id) throws ExecutionException, InterruptedException {
-        HystrixCommandGroupKey groupKey = HystrixCommandGroupKey.Factory.asKey("userKey");
-        com.netflix.hystrix.HystrixCommand.Setter setter = com.netflix.hystrix.HystrixCommand.Setter.withGroupKey(groupKey);
-        UserCommand userCommand = new UserCommand(setter, restTemplate, id);
+        UserCommand userCommand = new UserCommand(restTemplate, id);
         // 同步执行获取结果
 //        return userCommand.execute();
 
@@ -107,8 +105,7 @@ public class HelloService {
      */
     public Observable<User> observableGetUserById(Long id) {
         HystrixCommandGroupKey groupKey = HystrixCommandGroupKey.Factory.asKey("userKey");
-        com.netflix.hystrix.HystrixCommand.Setter setter = com.netflix.hystrix.HystrixCommand.Setter.withGroupKey(groupKey);
-        UserCommand userCommand = new UserCommand(setter, restTemplate, id);
+        UserCommand userCommand = new UserCommand(restTemplate, id);
         return userCommand.toObservable();
     }
 

@@ -785,3 +785,15 @@ public class HelloService {
 在传统的继承实现Hystrix命令时，可以在getFallback()方法中通过getExecutionException()方法来获取具体的异常，然后通过判断来进入不同的处理逻辑。
 
 在注解配置方式中，只需要在fallback实现方法的参数中增加Throwable e对象的定义，这样在方法内部就可以获取触发服务降级的具体异常内容。
+
+# 命令名称、分组和线程池划分
+```java
+    public UserCommand(RestTemplate restTemplate, Long id) {
+        super(Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("GroupName")).andCommandKey(HystrixCommandKey.Factory.asKey("CommandName")));
+        this.restTemplate = restTemplate;
+        this.id = id;
+    }
+```
+从上面的代码中可以看出，我们并没有直接设置命令名称，而是先调用了withGroupKey来设置命令组名，然后才通过调用andCommandKey来设置命令名。
+
+在Setter中只有withGroupKey静态函数可以创建Setter的实例，因此GroupKey是每个Setter必须的参数，而CommandKey则是一个可选参数。
