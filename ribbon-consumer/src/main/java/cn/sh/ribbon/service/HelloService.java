@@ -80,7 +80,7 @@ public class HelloService {
      * @param id
      * @return
      */
-    @HystrixCommand(fallbackMethod = "getDefaultUser")
+    @HystrixCommand(fallbackMethod = "getDefaultUser", ignoreExceptions = NullPointerException.class)
     public User findUserById(Long id) {
         return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
     }

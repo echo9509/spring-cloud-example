@@ -767,3 +767,21 @@ public class HelloService {
 在实际使用时，有一些情况可以不去实现降级逻辑，如：
 1. 执行写操作的命令: 当Hystrix命令是用来执行写操作而不是返回一些信息的时候，实现服务降级逻辑的意义不是很大。当写入失败时，我们通常只需要通知调用者即可。
 2. 执行批处理或离线计算命令: 当Hystrix命令是用来执行批处理程序生成一份报告或是进行任何类型的离线计算时，通常这些操作只需要将错误传播给调用者，然后让调用者稍后重试而不是发送给调用者一个静默的降级处理响应。
+
+# 异常处理
+## 异常传播
+在HystrixCommand实现的run()方法中抛出异常时，除了HystrixBadRequestException之外，其他异常均会被Hystrix认为命令执行失败并触发服务降级的处理逻辑，所以当需要在命令执行中抛出不触发服务降级的异常时来选择它。
+
+在使用注解配置实现Hystrix命令时，可以忽略指定的异常类型，只需要通过设置@HystrixCommand注解的ignoreExceptions参数，如下:
+```java
+    @HystrixCommand(fallbackMethod = "getDefaultUser", ignoreExceptions = NullPointerException.class)
+    public User findUserById(Long id) {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+```
+当上述方法抛出NullPointerException的异常时，不会触发后续的fallback逻辑。
+
+## 异常获取
+在传统的继承实现Hystrix命令时，可以在getFallback()方法中通过getExecutionException()方法来获取具体的异常，然后通过判断来进入不同的处理逻辑。
+
+在注解配置方式中，只需要在fallback实现方法的参数中增加Throwable e对象的定义，这样在方法内部就可以获取触发服务降级的具体异常内容。
