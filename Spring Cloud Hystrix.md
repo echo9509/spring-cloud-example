@@ -787,6 +787,7 @@ public class HelloService {
 在注解配置方式中，只需要在fallback实现方法的参数中增加Throwable e对象的定义，这样在方法内部就可以获取触发服务降级的具体异常内容。
 
 # 命令名称、分组和线程池划分
+## 继承实现自定义命令
 ```java
     public UserCommand(RestTemplate restTemplate, Long id) {
         super(Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("GroupName")).andCommandKey(HystrixCommandKey.Factory.asKey("CommandName")));
@@ -812,3 +813,12 @@ Hystrix还提供HystrixThreadPoolKey来对线程池进行设置，通过它可�
 ```
 在没有指定HystrixThreadPoolKey的情况下，会使用命令组的方式来划分线程池。通常情况下，我们**尽量使用HystrixThreadPoolKey来指定线程池的划分**。因为多个不同的命令可能从业务逻辑上来看属于同一个组，但是往往从实现本身上需要跟其他命令来进行隔离。
 
+## @HystrixCommand注解
+使用注解时只需要设置注解的commandKey、groupKey以及threadPoolKey属性即可，他分别表示了命令名称、分组以及线程池划分。
+```java
+    @HystrixCommand(fallbackMethod = "getDefaultUser", ignoreExceptions = NullPointerException.class,
+            commandKey = "findUserById", groupKey = "UserGroup", threadPoolKey = "findUserByIdThread")
+    public User findUserById(Long id) {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+```
