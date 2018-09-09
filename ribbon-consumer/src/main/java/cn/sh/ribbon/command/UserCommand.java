@@ -4,6 +4,7 @@ import cn.sh.common.entity.User;
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
+import com.netflix.hystrix.HystrixThreadPoolKey;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -16,7 +17,9 @@ public class UserCommand extends HystrixCommand<User> {
     private Long id;
 
     public UserCommand(RestTemplate restTemplate, Long id) {
-        super(Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("GroupName")).andCommandKey(HystrixCommandKey.Factory.asKey("CommandName")));
+        super(Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("GroupName"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("CommandName"))
+                .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("ThreadPoolKey")));
         this.restTemplate = restTemplate;
         this.id = id;
     }

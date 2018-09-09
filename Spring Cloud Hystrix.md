@@ -797,3 +797,18 @@ public class HelloService {
 从上面的代码中可以看出，我们并没有直接设置命令名称，而是先调用了withGroupKey来设置命令组名，然后才通过调用andCommandKey来设置命令名。
 
 在Setter中只有withGroupKey静态函数可以创建Setter的实例，因此GroupKey是每个Setter必须的参数，而CommandKey则是一个可选参数。
+
+通过设置命令组，Hystrix会根据组来组织和统计命令的告警、仪表盘等信息。除了上述可以统计信息之外，Hystrix命令默认的线程划分也是根据命令分组来实现的。默认情况下，Hystrix会让相同组名的命令使用同一个线程池，所以我们需要在创建Hystrix命令时为其指定命令组名来实现默认的线程池划分。
+
+Hystrix还提供HystrixThreadPoolKey来对线程池进行设置，通过它可以实现更细粒度的线程池划分。
+```java
+    public UserCommand(RestTemplate restTemplate, Long id) {
+        super(Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("GroupName"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("CommandName"))
+                .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("ThreadPoolKey")));
+        this.restTemplate = restTemplate;
+        this.id = id;
+    }
+```
+在没有指定HystrixThreadPoolKey的情况下，会使用命令组的方式来划分线程池。通常情况下，我们**尽量使用HystrixThreadPoolKey来指定线程池的划分**。因为多个不同的命令可能从业务逻辑上来看属于同一个组，但是往往从实现本身上需要跟其他命令来进行隔离。
+
