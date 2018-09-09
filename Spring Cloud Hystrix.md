@@ -822,3 +822,62 @@ Hystrix还提供HystrixThreadPoolKey来对线程池进行设置，通过它可�
         return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
     }
 ```
+
+# 请求缓存
+在高并发的场景之下，Hystrix中提供了请求缓存的功能，可以方便的开启和使用请求缓存来优化系统，达到减轻高并发时的请求线程消耗、降低请求响应时间的效果。
+
+## 开启请求缓存功能
+Hystrix请求缓存的使用非常简单，只需要在实现HystrixCommand或HystrixObservableCommand时，通过重载getCacheKey()方法来开启请求缓存。
+```java
+public class UserCommand extends HystrixCommand<User> {
+
+    private RestTemplate restTemplate;
+
+    private Long id;
+
+    public UserCommand(RestTemplate restTemplate, Long id) {
+        super(Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("GroupName"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("CommandName"))
+                .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("ThreadPoolKey")));
+        this.restTemplate = restTemplate;
+        this.id = id;
+    }
+
+    @Override
+    protected User run() throws Exception {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+
+    @Override
+    protected String getCacheKey() {
+        return String.valueOf(id);
+    }
+
+    @Override
+    protected User getFallback() {
+        User user = new User();
+        user.setId(1L);
+        user.setName("sh");
+        return user;
+    }
+}
+```
+在上面的示例中，通过getCacheKey方法中返回的请求缓存key值，就能让该请求命令具备缓存功能。当不同的外部请求处理逻辑调用了同一个依赖服务时，Hystrix会根据getCacheKey方法返回的值来区分是否是重复的请求，如果它们的cacheKey相同，那么依赖服务只会在第一个请求到达时被真实的调用一次，另外一个请求则是直接从请求缓存中返回结果。
+
+开启缓存主要有以下好处:
+1. 减少重复的请求数，降低依赖服务的并发度
+2. 在同一用户请求的上下文中，相同依赖服务的返回数据始终保持一致
+3. 请求缓存在run()和construct()执行之前生效，所以可以有效减少不必要的线程开销
+
+## 清理失效缓存功能
+使用请求缓存时，如果是只读操作，不需要考虑缓存内容是否正确的问题，但是如果请求命令中还有更新数据的写操作，那么缓存中的数据就需要我们在进行写操作时进行及时处理，以防止读操作的请求命令获取到了失效的数据。
+
+在Hystrix中，可以通过HystrixRequestCache.clear()方法来进行缓存的清理
+```java
+    public static void flushCache(Long id) {
+        //刷新缓存，根据id进行清理
+        HystrixRequestCache.getInstance(GETTER_KEY,
+                HystrixConcurrencyStrategyDefault.getInstance()).clear(String.valueOf(id));
+    }
+```
+在上面的代码中，增加了一个静态方法flushCache，该方法通过HystrixRequestCache.getInstance(GETTER_KEY,HystrixConcurrencyStrategyDefault.getInstance())方法从默认的Hystrix并发策略中根据GETTER_KEY获取到该命令的请求缓存对象HystrixRequestCache的实例，然后再调用该请求缓存对象实例的clear方法，对Key为更新User的id值的缓存内容进行清理。
