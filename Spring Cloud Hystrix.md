@@ -881,3 +881,8 @@ public class UserCommand extends HystrixCommand<User> {
     }
 ```
 在上面的代码中，增加了一个静态方法flushCache，该方法通过HystrixRequestCache.getInstance(GETTER_KEY,HystrixConcurrencyStrategyDefault.getInstance())方法从默认的Hystrix并发策略中根据GETTER_KEY获取到该命令的请求缓存对象HystrixRequestCache的实例，然后再调用该请求缓存对象实例的clear方法，对Key为更新User的id值的缓存内容进行清理。
+
+## 工作原理
+由于getCacheKey方法在AbstractCommand抽象命令类中实现，所以我们从这个抽象类看起。
+
+在AbstractCommand的源码片段中，可以看到，getCacheKey方法默认返回的是null，并且从isRequestCachingEnabled方法的逻辑中我们可以知道，如果不重写getCacheKey方法，让它返回一个非null值，那么缓存功能是不会开启的；同时请求命令的缓存开启属性也需要设置为true才能开启(该属性默认值为true,所以通常用该属性来控制请求缓存功能的强制关闭)。
