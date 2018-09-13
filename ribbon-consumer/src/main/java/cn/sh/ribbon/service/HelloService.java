@@ -6,6 +6,7 @@ import cn.sh.ribbon.command.UserObservableCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.netflix.hystrix.contrib.javanica.annotation.ObservableExecutionMode;
+import com.netflix.hystrix.contrib.javanica.cache.annotation.CacheResult;
 import com.netflix.hystrix.contrib.javanica.command.AsyncResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +81,7 @@ public class HelloService {
      */
     @HystrixCommand(fallbackMethod = "getDefaultUser", ignoreExceptions = NullPointerException.class,
             commandKey = "findUserById", groupKey = "UserGroup", threadPoolKey = "findUserByIdThread")
+    @CacheResult
     public User findUserById(Long id) {
         return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
     }

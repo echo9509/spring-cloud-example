@@ -892,3 +892,23 @@ public class UserCommand extends HystrixCommand<User> {
 1. 尝试获取请求缓存：Hystrix命令在执行前会根据之前提到的isRequestCacheingEnabled方法来判断当前命令是否启用了缓存。如果开启了请求缓存并且重写了getCacheKey方法，并返回了一个非null的缓存Key值，那么就使用getCacheKey返回的Key值去调用HystrixRequestCache中的get(String cacheKey)来获取缓存的HystrixCacheObservable对象。
 
 2. 将请求结果加入缓存：在执行命令缓存操作前，我们可以看到一个已经获得一个延迟执行命令结果HystrixObservable。接下来与尝试获取请求缓存操作一样，需要判断当前命令是否开启了请求缓存功能，如果开启了请求缓存并且getCacheKey返回了具体的Key值，就将hystrixObservable对象包装成请求缓存结果HystrixCachedObservable的实例对象toCache，然后将其放入当前命令的缓存对象中。从调用的putIfAbsent中，大致可以猜到在请求缓存对象HystrixRequestCache中维护了一个线程安全的Map来保护请求缓存的响应，所以在调用putIfAbsent将包装的请求缓存放入缓存对象后，对其返回结果fromCache进行了判断，如果其不为null，说明当前缓存Key的请求命令缓存命中，直接对toCache执行取消订阅操作(即不再发起真实请求)，同时调用缓存命令的处理方法handleRequestCacheHitAndEmitValues来执行缓存命中的结果获取。如果返回的fromCache为null，说明缓存没有命中，则将当前结果toCache缓存起来，并将其转换成Observable返回给调用者使用。
+
+## 使用注解实现请求缓存
+注解 | 描述 | 属性
+--- | --- | ---
+@CacheResult | 该注解用来标记请求命令返回的结果应该被缓存，他必须与@HystrixCommand注解结合使用 | cacheKeyMethod
+@CacheRemove | 该注解让请求命令缓存失效，失效的缓存根据定义的Key决定 | commandKey,cacheKeyMethod
+@CacheKey | 该注解用来在请求命令的参数上标记，使其作为缓存的Key值，如果没有标注则会使用所有参数。如果同时还使用了@CacheResult和@CacheRemove注解的cacheKeyMethod方法指定缓存Key的生成，那么该注解将不会起作用 | value
+
+### 设置请求缓存
+只需要在@HystrixCommand注解的方法上添加@CacheResult注解就可以为请求命令开启缓存功能，而它的缓存Key值会使用所有的参数。
+```java
+    @HystrixCommand(fallbackMethod = "getDefaultUser", ignoreExceptions = NullPointerException.class,
+            commandKey = "findUserById", groupKey = "UserGroup", threadPoolKey = "findUserByIdThread")
+    @CacheResult
+    public User findUserById(Long id) {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+``` 
+### 定义缓存Key
+当使用注解来定义请求缓存时，若要为请求命令指定具体的缓存Key生成规则，可以使用@CacheResult和@CacheRemove注解的cacheKeyMethod属性指定具体的生成函数，也可以通过@CacheKey注解在方法参数中指定用于组装缓存Key的元素。
