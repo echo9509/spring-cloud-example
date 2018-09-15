@@ -949,3 +949,113 @@ public class UserCommand extends HystrixCommand<User> {
         restTemplate.postForObject("http://USER-SERVICE/user", user, User.class);
     }
 ```
+
+## 请求合并
+微服务架构中的依赖通过远程调用实现，为了优化网络通信的耗时和依赖服务线程池的资源，避免出现排队等待与响应延迟的情况。Hystrix提供了**HystrixCollapser**来实现请求的合并，以减少通信消耗和线程数的占用。
+
+HystrixCollapser实现了在HystrixCommand之前放置一个合并处理器，将处于一个很短的时间窗(默认10ms)内对同一依赖服务的多个请求进行整合并以批量方式发起请求的功能（服务提供方也需要提供响应的批量实现接口）。
+通过HystrixCollapser的封装，开发者不需要关注线程合并的细节过程，只需关注批量化服务和处理。
+
+从HystrixCollapser抽象类的定义中可以看到，它指定了三个不同的类型
+1. BatchReturnType：合并后批量请求的返回类型
+2. ResponseType：单个请求返回的类型
+3. RequestArgumentType：请求参数类型
+
+HystrixCollapser下的三个抽象方法：
+1. RequestArgumentType getRequestArgument(): 该函数用来定义获取请求参数的方法。
+2. HystrixCommand<BatchReturnType> createCommand(Collection<CollapsedRequest<ResponseType, RequestArgumentType>> requests): 合并请求产生批量命令的具体实现方法
+3. mapResponseToRequests(BatchReturnType batchResponse, Collection<CollapsedRequest<ResponseType, RequestArgumentType>> requests): 批量命令结果返回后的处理，这里需要实现将批量结果拆分并传递给合并前的各个原子请求命令的逻辑。
+
+### 继承方式理解实现请求合并
+1、在USER-SERVICE中提供获取User的两个接口
+
+1. /users/{id}: 根据id返回User对象的GET请求接口
+2. /users?ids={ids}: 根据ids返回User对象列表的GET接口，其中ids为以,分隔的id集合
+
+2、在服务消费端RIBBON-CONSUMER中，提供一个UserService，用来使用RestTemplate进行远程访问
+```java
+@Service
+public class UserServiceImpl implements UserService {
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    @Override
+    public User find(Long id) {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+
+    @Override
+    public List<User> findAll(List<Long> idList) {
+        return restTemplate.getForObject("http://USER-SERVICE/users?ids={1}", List.class, StringUtils.join(idList,","));
+    }
+}
+```
+
+3、实现将短时间内多个获取单一User对象的请求命令进行合并
+
+&emsp; **1、第一步，为请求合并的实现准备一个批量请求命令的实现**
+```java
+public class UserBatchCommand extends HystrixCommand<List<User>> {
+
+    private UserService userService;
+
+    private List<Long> idList;
+
+    protected UserBatchCommand(UserService userService, List<Long> idList) {
+        super(Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("userBatchGroup")));
+        this.userService = userService;
+        this.idList = idList;
+    }
+
+    @Override
+    protected List<User> run() throws Exception {
+        return userService.findAll(idList);
+    }
+}
+```
+
+&emsp;**2、通过继承HystrixCollapser实现请求合并器**
+```java
+public class UserCollapseCommand extends HystrixCollapser<List<User>, User, Long> {
+
+    private UserService userService;
+
+    private Long userId;
+
+    public UserCollapseCommand(UserService userService, Long userId) {
+        super(Setter.withCollapserKey(HystrixCollapserKey.Factory.asKey("userCollapse"))
+                .andCollapserPropertiesDefaults(HystrixCollapserProperties.Setter().withTimerDelayInMilliseconds(100)));
+        this.userService = userService;
+        this.userId = userId;
+    }
+
+    @Override
+    public Long getRequestArgument() {
+        return userId;
+    }
+
+    @Override
+    protected HystrixCommand<List<User>> createCommand(Collection<CollapsedRequest<User, Long>> collapsedRequests) {
+        List<Long> userIdList = new ArrayList<>(collapsedRequests.size());
+        userIdList.addAll(collapsedRequests.stream().map(CollapsedRequest::getArgument).collect(Collectors.toList()));
+        return new UserBatchCommand(userService, userIdList);
+    }
+
+    @Override
+    protected void mapResponseToRequests(List<User> batchResponse, Collection<CollapsedRequest<User, Long>> collapsedRequests) {
+        int count = 0;
+        for (CollapsedRequest<User, Long> collapsedRequest : collapsedRequests) {
+            User user = batchResponse.get(count++);
+            collapsedRequest.setResponse(user);
+        }
+    }
+    
+}
+```
+在上面的构造函数中，我们为请求合并器设置了时间延迟属性，合并器会在该时间窗内收集获取单个User的请求并在时间窗结束时进行合并组装成单个批量要求。
+
+getRequestArgument方法返回给定的单个请求参数userId，createCommand和mapResponseToRequests时请求合并器的两个核心
+
+1. createCommand: 该方法的collapsedRequests参数中保存了延迟时间窗中收集到的所有获取单个User的请求。通过获取这些请求的参数来组织上面我们准备的批量请求命令的UserBatchCommand实例。
+2. mapResponseToRequests: 在批量请求命令UserBatchCommand实例被触发执行完成之后，该方法开始执行，其中batchResponse参数保存了createCommand中组织的批量请求命令的返回结果，而collapsedRequests参数则代表了每个被合并的请求。在这里我们通过遍历批量结果batchResponse对象，为collasperRequests中每个合并前的单个请求设置返回结果，以此完成批量结果到单个请求结果的转换。

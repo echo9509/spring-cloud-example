@@ -1,5 +1,4 @@
-package cn.sh.user.service;
-
+package cn.sh.ribbon.service;
 
 import cn.sh.common.entity.User;
 
@@ -10,7 +9,7 @@ import java.util.List;
  */
 public interface UserService {
 
-    User getUserById(Long id);
+    User find(Long id);
 
     List<User> findAll(List<Long> idList);
 }
