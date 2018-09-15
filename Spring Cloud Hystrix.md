@@ -912,3 +912,40 @@ public class UserCommand extends HystrixCommand<User> {
 ``` 
 ### 定义缓存Key
 当使用注解来定义请求缓存时，若要为请求命令指定具体的缓存Key生成规则，可以使用@CacheResult和@CacheRemove注解的cacheKeyMethod属性指定具体的生成函数，也可以通过@CacheKey注解在方法参数中指定用于组装缓存Key的元素。
+```java
+    @HystrixCommand(fallbackMethod = "getDefaultUser", ignoreExceptions = NullPointerException.class,
+            commandKey = "findUserById", groupKey = "UserGroup", threadPoolKey = "findUserByIdThread")
+    @CacheResult(cacheKeyMethod = "findUserIdCacheKey")
+    public User findUserById(@CacheKey("id") Long id) {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+
+    private Long findUserIdCacheKey(Long id) {
+        return id;
+    }
+```
+**@CacheKey注解除了可以指定方法参数作为缓存Key以外，还允许访问参数对象的内部属性作为缓存Key。比如指定User对象的id属性作为缓存Key**
+
+### 缓存清理
+之前的示例中我们通过@CacheResult注解将请求结果置入Hystrix的请求缓存中。如果有update操作，我们需要让缓存失效，此时就需要通过@CacheRemove注解实现失效缓存的清理。
+
+**@CacheRemove必须指定commandKey属性，用来指明需要使用请求缓存的请求命令。**
+```java
+    @HystrixCommand(fallbackMethod = "getDefaultUser", ignoreExceptions = NullPointerException.class,
+            commandKey = "findUserById", groupKey = "UserGroup", threadPoolKey = "findUserByIdThread")
+    @CacheResult
+    public User findUserById(@CacheKey("id") Long id) {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+
+    private Long findUserIdCacheKey(Long id) {
+        return id;
+    }
+
+
+    @HystrixCommand
+    @CacheRemove(commandKey = "findUserById")
+    public void updateUser(@CacheKey("id") User user) {
+        restTemplate.postForObject("http://USER-SERVICE/user", user, User.class);
+    }
+```

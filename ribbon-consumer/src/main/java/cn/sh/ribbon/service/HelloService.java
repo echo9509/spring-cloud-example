@@ -6,6 +6,8 @@ import cn.sh.ribbon.command.UserObservableCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.netflix.hystrix.contrib.javanica.annotation.ObservableExecutionMode;
+import com.netflix.hystrix.contrib.javanica.cache.annotation.CacheKey;
+import com.netflix.hystrix.contrib.javanica.cache.annotation.CacheRemove;
 import com.netflix.hystrix.contrib.javanica.cache.annotation.CacheResult;
 import com.netflix.hystrix.contrib.javanica.command.AsyncResult;
 import org.slf4j.Logger;
@@ -79,11 +81,24 @@ public class HelloService {
      * @param id
      * @return
      */
+//    @CacheResult
+//    @CacheResult(cacheKeyMethod = "findUserIdCacheKey")
     @HystrixCommand(fallbackMethod = "getDefaultUser", ignoreExceptions = NullPointerException.class,
             commandKey = "findUserById", groupKey = "UserGroup", threadPoolKey = "findUserByIdThread")
     @CacheResult
-    public User findUserById(Long id) {
+    public User findUserById(@CacheKey("id") Long id) {
         return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+
+    private Long findUserIdCacheKey(Long id) {
+        return id;
+    }
+
+
+    @HystrixCommand
+    @CacheRemove(commandKey = "findUserById")
+    public void updateUser(@CacheKey("id") User user) {
+        restTemplate.postForObject("http://USER-SERVICE/user", user, User.class);
     }
 
     /**
