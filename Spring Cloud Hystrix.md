@@ -1154,3 +1154,24 @@ execution配置控制的是HystrixCommand.run()的执行。
 全局配置属性 | hystrix.command.default.execution.isolation.semaphore.maxConcurrentRequests
 实例默认值 | 通过HystrixCommandProperties.Setter().withExecutionIsolationSemaphoreMaxConcurrentRequests(int value)设置，也可通过@HystrixProperty(name="execution.isolation.semaphore.maxConcurrentRequests", value="2")注解来设置
 实例配置属性 | hystrix.command.HystrixCommandKey.execution.isolation.semaphore.maxConcurrentRequests
+
+### fallback配置
+用来控制HystrixCommand.getFallback()的执行。这些属性同时适用于线程池的信号量的隔离策略。
+
+**fallback.isolation.semaphore.maxConcurrentRequests**：该属性用来设置从调用线程中允许HystrixCommand.getFallback()执行的最大并发请求数。当达到最大并发请求数时，后续的请求将会被拒绝并抛出异常。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 10
+全局配置属性 | hystrix.command.default.fallback.isolation.semaphore.maxConcurrentRequests
+实例默认值 | 通过HystrixCommandProperties.Setter().withFallbackIsolationSemaphoreConcurrentRequests(int value)设置，也可以通过@HystrixProperty(name="fallback.isolation.semaphore.maxConcurrentRequests", value="20")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.fallback.isolation.semaphore.maxConcurrentReuqsts
+
+**fallback.enabled**：该属性用来设置服务降级策略是否启用，如果设置为false，那么当请求失败或者拒绝发生时，将不会调用HystrixCommand.getFallBack()来执行服务降级逻辑
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | true
+全局配置属性 | hystrix.command.default.fallback.enabled
+实例默认值 | 通过HysrtixCommandProperties.Setter().withFallbackEnabled(boolean value)设置，也可通过@HystrixProperty(name="fallback.enabled", value="false")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.fallback.enabled
