@@ -1059,3 +1059,27 @@ getRequestArgument方法返回给定的单个请求参数userId，createCommand�
 
 1. createCommand: 该方法的collapsedRequests参数中保存了延迟时间窗中收集到的所有获取单个User的请求。通过获取这些请求的参数来组织上面我们准备的批量请求命令的UserBatchCommand实例。
 2. mapResponseToRequests: 在批量请求命令UserBatchCommand实例被触发执行完成之后，该方法开始执行，其中batchResponse参数保存了createCommand中组织的批量请求命令的返回结果，而collapsedRequests参数则代表了每个被合并的请求。在这里我们通过遍历批量结果batchResponse对象，为collasperRequests中每个合并前的单个请求设置返回结果，以此完成批量结果到单个请求结果的转换。
+
+### 使用注解实现请求合并器
+```java
+    @HystrixCollapser(batchMethod = "findAll",
+            collapserProperties = {@HystrixProperty(name ="timerDelayInMilliseconds", value = "100")})
+    public User find(Long id) {
+        return restTemplate.getForObject("http://USER-SERVICE/users/{1}", User.class, id);
+    }
+
+    @HystrixCommand
+    public List<User> findAll(List<Long> idList) {
+        return restTemplate.getForObject("http://USER-SERVICE/users?ids={1}", List.class, StringUtils.join(idList,","));
+    }
+```
+在查询单个User的请求命令上通过@HystrixCollapser注解创建了合并请求，并通过batchMethod属性指定了批量请求的实现方法为findAll，通过collapserProperties为请求合并器设置相关属性。
+这里使用@HystrixProperty(name ="timerDelayInMilliseconds", value = "100")将合并时间窗设置为100ms。
+
+### 请求合并缺点
+请求合并虽然可以减少请求的数量以缓解依赖服务线程池的压力，但是用于请求合并的延迟时间窗会使得依赖服务的请求延迟增高。
+
+在决定是否使用请求合并器主要参考以下两点：
+1. 请求命令本身的延迟：如果依赖服务的请求命令本身是一个高延迟的命令，那么可以使用请求合并器。
+2. 延迟时间窗内的并发量：如果一个时间窗内只有1-2个请求，那么这样额依赖服务不适合使用请求合并器。如果一个时间窗内具有很高的并发量，并且服务提供方也实现了批量处理接口，那么使用请求合并器可以有效减少网络连接数量并极大提升系统吞吐量。
+
