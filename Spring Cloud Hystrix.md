@@ -1109,3 +1109,48 @@ execution配置控制的是HystrixCommand.run()的执行。
 全局配置属性 | hystrix.command.default.execution.isolation.strategy
 实例默认值 | 通过HystrixCommandProperties.Setter().withExecutionIsolationStrategy(ExecutionIsolationStrategy.THREAD)设置，也可以通过@HystrixProperty(name="execution.isolation.strategy",value="THREAD")注解设置
 实例配置属性 | hystrix.command.HystrixCommandKey.execution.isolation.strategy
+
+**execution.isolation.thread.timeoutInMilliseconds**：该属性用来配置HystrixCommand执行的超时时间，单位ms。当HystrixCommand执行时间超过该配置之后，Hystrix会将该执行命令标记为TIMEOUT并进入服务降级处理逻辑。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 1000ms
+全局配置属性 | hystrix.command.default.execution.isolation.thread.timeoutInMillseconds
+实例默认值 | 通过HystrixCommandProperties.Setter().withExecutionTimeoutInMillseconds(int value)设置，也可通过@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="2000")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.execution.isolation.thread.timeoutInMilliseconds
+
+**execution.timeout.enabled**：该属性用来配置HystrixCommand.run()的执行是否启用超时时间。默认为true，如果设置为false，那么execution.isolation.thread.timeoutInMilliseconds属性的配置将不再起作用。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | true
+全局配置属性 | hystrix.command.default.execution.timeout.enabled
+实例默认值 | 通过HystrixCommandProperties.Setter().withExecutionTimeoutEnabled(boolean value)设置，也可以通过@HystrixProperty(name="execution.timeout.enabled", value="false")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.execution.timeout.enabled
+
+**execution.isolation.thread.interruptOnTimeout**：该属性用来配置当HystrixCommand.run()执行超时的时候是否要将它中断。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | true
+全局配置属性 | hystrix.command.default.execution.isolation.thread.interruptOnTimeout
+实例默认值 | 通过HystrixCommandProperties.Setter().witheExecutionIsolationThreadInterruptOnTimeout(boolean value)设置，也可通过@HystrixProperty(name="execution.isolation.thread.interruptOnTimeout", value="false")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.execution.isolation.threa.interruptOnTimeout
+
+**execution.isolation.thread.interruptOnCancel**：该属性用来配置当HystrixCommand.run()执行被取消的时候是否要将它中断
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | true
+全局配置属性 | hystrix.command.default.execution.isolation.thread.interruptOnCancel
+实例默认值 | 通过HystrixCommandProperties.Setter().withExecutionIsolationThreadInterruptOnCancel(boolean value)设置，也可通过@HystrixProperty(name="execution.isolation.thread.interruptOnCancel", value="false")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.execution.isolation.thread.interruotOnCancel
+
+**execution.isolation.semaphore.maxConcurrentRequests**：当HystrixCommand的隔离策略使用信号量的时候，该属性用来配置信号量的大小(并发请求数)。当最大并发请求数达到该设置值时，后续的请求将会被拒绝。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 10
+全局配置属性 | hystrix.command.default.execution.isolation.semaphore.maxConcurrentRequests
+实例默认值 | 通过HystrixCommandProperties.Setter().withExecutionIsolationSemaphoreMaxConcurrentRequests(int value)设置，也可通过@HystrixProperty(name="execution.isolation.semaphore.maxConcurrentRequests", value="2")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.execution.isolation.semaphore.maxConcurrentRequests
