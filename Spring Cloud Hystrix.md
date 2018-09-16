@@ -1083,3 +1083,29 @@ getRequestArgument方法返回给定的单个请求参数userId，createCommand�
 1. 请求命令本身的延迟：如果依赖服务的请求命令本身是一个高延迟的命令，那么可以使用请求合并器。
 2. 延迟时间窗内的并发量：如果一个时间窗内只有1-2个请求，那么这样额依赖服务不适合使用请求合并器。如果一个时间窗内具有很高的并发量，并且服务提供方也实现了批量处理接口，那么使用请求合并器可以有效减少网络连接数量并极大提升系统吞吐量。
 
+# 属性详解
+1. 通过继承的方式，可以使用Setter对象来对请求请求命令的属性进行设置
+2. 当通过注解时，只需要使用@HystrixCommand中的commandProperties
+
+属性的设置存在以下优先级区别（优先级由低到高）：
+1. 全局设置默认值：如果没有设置下面三个级别的属性，那么这个属性就是默认值。
+2. 全局配置属性：通过在配置文件中定义全局属性值，在应用启动时或在与Spring Cloud Config和Spring Cloud Bus实现的动态刷新配置功能配合下，可以实现对全局默认值的覆盖以及在运行期对全局默认值的动态调整。
+3. 实例默认值：通过代码为实例定义默认值。通过代码的方式为实例设置属性值来覆盖默认的全局配置。
+4. 实例配置属性：通过配置文件来为指定的实例进行属性配置，以覆盖前面的三个默认值。它也可用Spring Cloud Config和Spring Cloud Bus实现的动态刷新配置的功能实现对具体实例配置的动态调整。
+
+## Command属性
+Command属性主要用来控制HystrixCommand命令的行为。
+
+### execution配置
+execution配置控制的是HystrixCommand.run()的执行。
+
+**execution.isolation.strategy**：该属性用来设置HystrixCommand.run()执行的隔离策略，有如下两个选项：
+1. THREAD：通过线程池的隔离策略。它在独立的线程上执行，并且它的并发限制受线程池中线程数量的限制
+2. SEMPAHORE：通过信号量隔离的策略。它在调用线程上执行，并且它的并发限制受信号量计数的限制。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | THREAD
+全局配置属性 | hystrix.command.default.execution.isolation.strategy
+实例默认值 | 通过HystrixCommandProperties.Setter().withExecutionIsolationStrategy(ExecutionIsolationStrategy.THREAD)设置，也可以通过@HystrixProperty(name="execution.isolation.strategy",value="THREAD")注解设置
+实例配置属性 | hystrix.command.HystrixCommandKey.execution.isolation.strategy
