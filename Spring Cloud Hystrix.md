@@ -1232,3 +1232,77 @@ execution配置控制的是HystrixCommand.run()的执行。
 全局配置属性 | hystrix.command.default.circuitBreaker.forceClosed
 实例默认值 | 通过HystrixCommandProperties.Setter().withCircuitBreakerForceClosed(boolean value)设置，也可通过@HystrixProperty(name="circuitBreaker.forceClosed", value="true")注解来设置
 实例配置属性 | hystrix.command.HystrixCommandKey.circuitBreaker.forceClosed
+
+### metrics配置
+主要与HystrixCommand和HystrixObservableCommand执行中捕获的指标信息有关。
+
+**metrics.rollingStats.timeInMilliseconds**：该属性用来设置滚动时间窗的长度，单位ms。该时间用于断路器判断健康度时需要收集信息的持续时间。断路器在收集指标信息的时候会根据设置的时间窗长度拆分成多个桶来累计度量值，每个桶记录了一段时间内的采集指标。例如，当采用默认值10000ms时，断路器默认将其拆分为10个桶，每个桶记录1000ms内的指标信息。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 10000
+全局配置属性 | hystrix.command.default.metrics.rollingStats.timeInMilliseconds
+实例默认值 | 通过HystrixCommandProperties.Setter().withMetricsRollingStatisticalWindowInMilliseconds(int value)设置，也可通过@HystrixProperty(name="metrics.rollingStats.timeInMilliseconds", value="20000")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.metrics.rollingStats.timeInMilliseconds
+
+**注意该属性从Hystrix 1.4.12版本开始，只有在应用初始化的时候生效，通过动态刷新配置不会产生效果，这样做是为了避免出现运行期监测数据丢失的情况。并且该参数的配置必须能被metrics.rollingStats.numBuckets参数整除，不然抛出异常。**
+
+**metrics.rollingStats.numBuckets**：该属性用来设置滚动时间窗统计指标信息时划分桶的数量
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 10
+全局配置属性 | hystrix.command.default.metrics.rollingStats.numBuckets
+实例默认值 | 通过HystrixCommandProperties.Setter().withMetricsRollingStatisticalWindowBuckets(int value)设置，也可通过@HystrixProperty(name="metrics.rollingStats.numBuckets", value="20")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.metrics.rollingStats.numBuckets
+
+**metrics.rollingPercentile.enabled**：该属性用来设置对命令执行的延迟是否使用百分位数来跟踪和计算。如果设置为false，那么所有的概要统计都将返回-1。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | true
+全局配置属性 | hystrix.command.default.metrics.rollingPercentile.enabled
+实例默认值 | 通过HystrixCommandProperties.Setter().withMetricsRollingPercentileEnabled(boolean value)设置，也可通过@HystrixProperty(name="metrics.rollingPercentile.enabled", value="false")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.metrics.rollingPercentile.enabled
+
+**metrics.rollingPercentile.timeInMilliseconds**：该属性用来设置百分位统计的滚动窗口的持续时间，单位ms。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 60000
+全局配置属性 | hystrix.command.default.metrics.rollingPercentile.timeInMilliseconds
+实例默认值 | 通过HystrixCommandProperties.Setter().withMetricsRollingPercentileWindowInMilliseconds(int value)设置，也可通过@HystrixProperty(name="metrics.rollingPercentile.timeInMilliseconds", value="50000")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.metrics.rollingPercentile.timeInMilliseconds
+
+**注意该属性从Hystrix 1.4.12版本开始，只有在应用初始化的时候生效，通过动态刷新配置不会产生效果，这样做是为了避免出现运行期监测数据丢失的情况。并且该参数的配置必须能被metrics.rollingPercentile.numBuckets参数整除，不然抛出异常。**
+
+**metrics.rollingPercentile.numBuckets**：该属性用来设置百分位统计滚动窗口中使用桶的数量。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 6
+全局配置属性 | hystrix.command.default.metrics.rollingPercentile.numBuckets
+实例默认值 | 通过HystrixCommandProperties.Setter().withMetricsRollingPercentileWindowBuckets(int value)设置，也可通过@HystrixProperty(name="metrics.rollingPercentile.numBuckets", value="6")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.metrics.rollingPercentile.numBuckets
+
+
+**metrics.rollingPercentile.bucketSize**：该属性用来设置在执行过程中每个桶中保留的最大执行次数。如果在滚动时间内发生超过该设定值的执行次数，就从最初的位置开始重写。例如，
+将该值设置为100，滚动窗口为10s，若在10s内一个桶中发生了500次执行，那么桶中只保留最后的100次执行的统计。另外，增加该值的大小将会增加内存量的消耗，并增加排序百分位数所需的计算时间。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 100
+全局配置属性 | hystrix.command.default.metrics.rollingPercentile.bucketSize
+实例默认值 | 通过HystrixCommandProperties.Setter().withMetricsRollingPercentileBucketSize(int value)设置，也可通过@HystrixProperty(name="metrics.rollingPercentile.bucketSize", value="120")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.metrics.rollingPercentile.bucketSize
+
+**注意该属性从Hystrix 1.4.12版本开始，只有在应用初始化的时候生效，通过动态刷新配置不会产生效果，这样做是为了避免出现运行期监测数据丢失的情况。**
+
+**metrics.healthSnapshot.intervalInMilliseconds**：该属性用来设置采集影响断路器状态的健康快照(请求的成功、错误百分比)的间隔等待时间。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 500
+全局配置属性 | hystrix.command.default.metrics.healthSnapshot.intervalInMilliseconds
+实例默认值 | 通过HystrixCommandProperties.Setter().withMetricsHealthSnapshotIntervalInMilliseconds(int value)设置，也可通过@HystrixProperty(name="metrics.healthSnapshot.intervalInMilliseconds", value="600")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.metrics.healthSnapshot.intervalInMilliseconds
