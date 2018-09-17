@@ -1175,3 +1175,60 @@ execution配置控制的是HystrixCommand.run()的执行。
 全局配置属性 | hystrix.command.default.fallback.enabled
 实例默认值 | 通过HysrtixCommandProperties.Setter().withFallbackEnabled(boolean value)设置，也可通过@HystrixProperty(name="fallback.enabled", value="false")注解来设置
 实例配置属性 | hystrix.command.HystrixCommandKey.fallback.enabled
+
+### circuitBreaker配置
+主要用来控制HystrixCircuitBreaker的行为。
+
+**circuitBreaker.enabled**：该属性用来确定当服务请求命令失败时，是否使用断路器来跟踪其健康指标和熔断请求。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | true
+全局配置属性 | hystrix.command.default.circuitBreaker.enabled
+实例默认值 | 通过HystrixCommandProperties.Setter().withCircuitBreakerEnabled(boolean value)设置，也可通过@HystrixProperty(name="circuitBreaker.enabled", value="false")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.circuitBreaker.enabled
+
+**circuitBreaker.requestVolumeThreshold**：该属性用来设置在滚动时间窗(默认10s)中，断路器熔断的最小请求数(失败的)。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 20
+全局配置属性 | hystrix.command.default.circuitBreaker.requestVolumeThreshold
+实例默认值 | 通过HystrixCommandProperties.Setter().withCircuitBreakerRequestVolumeThreshold(int value)设置，也可通过@HystrixProperty(name="circuitBreaker.requestVolumeThreshold", value="30")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.circuitBreaker.requestVolumeThreshold
+
+**circuitBreaker.sleepWindowInMilliseconds**：该属性用来设置当断路器打开之后的休眠时间窗。休眠时间窗结束后，会将断路器置为半开状态，尝试熔断的请求命令，如果依然失败就将断路器继续设置为打开状态，如果成功就设置为关闭状态。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 5000
+全局配置属性 | hystrix.command.default.circuitBreaker.sleepWindowInMilliseconds
+实例默认值 | 通过HystrixCommandProperties.Setter().withCircuitBreakerSleepWindowInMilliseconds(int value)设置，也可通过@HystrixProperty(name="circuitBreaker.sleepWindowInMilliseconds", value="3000")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.circuitBreaker.sleepWindowInMilliseconds
+
+**circuitBreaker.errorThresholdPercentage**：该属性用来设置断路器打开的错误百分比条件。表示在滚动时间窗中，请求数量在未超过circuitBreaker.requestVolumeThreshold阀值的前提下，如果错误请求数的百分比超过50，就把断路器设置为打开状态，否则就设置为关闭状态。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 50
+全局配置属性 | hystrix.command.default.circuitBreaker.errorThresholdPercentage
+实例默认值 | 通过HystrixCommandProperties.Setter().withCircuitBreakerErrorThresholdPercentage(int value)设置，也可通过@HystrixProperty(name="circuitBreaker.errorThresholdPercentage", value="40")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.circuitBreaker.errorThresholdPercentage
+
+**circuitBreaker.forceOpen**：如果将该属性设置为true，断路器将强制进入打开状态，他会拒绝所有请求。优先级高于circuitBreaker.forceClosed
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | false
+全局配置属性 | hystrix.command.default.circuitBreaker.forceOpen
+实例默认值 | 通过HystrixCommandProperties.Setter().withCircuitBreakerForceOpen(boolean value)设置，也可通过@HystrixProperty(name="circuitBreaker.forceOpen", value="true")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.circuitBreaker.forceOpen
+
+**circuitBreaker.forceClosed**：如果将该属性设置为true，断路器将强制进入关闭状态，它会接受所有请求。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | false
+全局配置属性 | hystrix.command.default.circuitBreaker.forceClosed
+实例默认值 | 通过HystrixCommandProperties.Setter().withCircuitBreakerForceClosed(boolean value)设置，也可通过@HystrixProperty(name="circuitBreaker.forceClosed", value="true")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.circuitBreaker.forceClosed
