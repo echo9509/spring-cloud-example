@@ -1306,3 +1306,110 @@ execution配置控制的是HystrixCommand.run()的执行。
 全局配置属性 | hystrix.command.default.metrics.healthSnapshot.intervalInMilliseconds
 实例默认值 | 通过HystrixCommandProperties.Setter().withMetricsHealthSnapshotIntervalInMilliseconds(int value)设置，也可通过@HystrixProperty(name="metrics.healthSnapshot.intervalInMilliseconds", value="600")注解来设置
 实例配置属性 | hystrix.command.HystrixCommandKey.metrics.healthSnapshot.intervalInMilliseconds
+
+### requestContext配置
+下面的属性主要涉及HystrixCommand使用的HystrixRequestContext的设置。
+
+**requestCache.enabled**：此属性用来配置是否开启请求缓存
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | true
+全局配置属性 | hystrix.command.default.requestCache.enabled
+实例默认值 | 通过HystrixCommandProperties.Setter().withRequestCacheEnabled(boolean value)设置，也可通过@HystrixProperty(name="requestCache.enabled", value="false")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.requestCache.enabled
+
+**requestLog.enabled**：该属性用来设置HystrixCommand的执行和事件是否打印日志到HystrixRequestLog中。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | true
+全局配置属性 | hystrix.command.default.requestLog.enabled
+实例默认值 | 通过HystrixCommandProperties.Setter().withRequestLogEnabled(boolean value)设置，也可通过@HystrixProperty(name="requestLog.enabled", value="false")注解来设置
+实例配置属性 | hystrix.command.HystrixCommandKey.requestLog.enabled
+
+### collapser属性
+该属性除了在代码中用set和配置文件配置以外，也可以使用注解进行配置。可以使用@HystrixCollapser中的collapserProperties属性来设置
+
+下面这些属性用来控制命令合并相关的行为。
+
+**maxRequestInBatch**：该参数用来设置一次请求合并批处理中允许的最大请求数。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | Integer.MAX_VALUE
+全局配置属性 | hystrix.collapser.default.maxRequestInBatch
+实例默认值 | 通过HystrixCollapserProperties.Setter().withMaxRequestInBatch(int value)设置，也可通过@HystrixProperty(name="maxRequestInBatch", value="100")注解来设置
+实例配置属性 | hystrix.collapser.HystrixCollapserKey.maxRequestInBatch
+
+**timeDelayInMilliseconds**：该参数用来设置批处理过程中每个命令延迟的时间，单位为ms。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 10
+全局配置属性 | hystrix.collapser.default.timeDelayInMilliseconds
+实例默认值 | 通过HystrixCollapserProperties.Setter().withTimeDelayInMilliseconds(int value)设置，也可通过@HystrixProperty(name="timeDelayInMilliseconds", value="20")注解来设置
+实例配置属性 | hystrix.collapser.HystrixCollapserKey.timeDelayInMilliseconds
+
+**requestCache.enabled**：该参数用来设置批处理过程中是否开启请求缓存。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | true
+全局配置属性 | hystrix.collapser.default.requestCache.enabled
+实例默认值 | 通过HystrixCollapserProperties.Setter().withRequestCacheEnabled(boolean value)设置，也可通过@HystrixProperty(name="requestCache.enabled", value="false")注解来设置
+实例配置属性 | hystrix.collapser.HystrixCollapserKey.requestCache.enabled
+
+### threadPool属性
+该属性除了在代码中用set和配置文件配置以外，也可以使用注解进行配置。可以使用@HystrixCommand中的threadPoolProperties属性来设置
+
+下面这些属性用来控制Hystrix命令所属线程池的配置。
+
+**coreSize**：该参数用来设置执行命令线程池的核心线程数，该值也就是命令执行的最大并发数。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 10
+全局配置属性 | hystrix.threadPool.default.coreSize
+实例默认值 | 通过HystrixThreadPoolProperties.Setter().withCoreSize(int value)设置，也可通过@HystrixProperty(name="coreSize", value="20")注解来设置
+实例配置属性 | hystrix.threadPool.HystrixThreadPoolKey.coreSize
+
+**maxQueueSize**：该参数用来设置线程池的最大队列大小。当设置为-1时，线程池将使用SynchronousQueue实现的队列，否则将使用LinkedBlockingQueue实现的队列。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | -1
+全局配置属性 | hystrix.threadPool.default.maxQueueSize
+实例默认值 | 通过HystrixThreadPoolProperties.Setter().withMaxQueueSize(int value)设置，也可通过@HystrixProperty(name="maxQueueSize", value="20")注解来设置
+实例配置属性 | hystrix.threadPool.HystrixThreadPoolKey.maxQueueSize
+
+**备注：该属性只有在初始化的时候才有用，无法通过动态刷新的方式来调整。**
+
+**queueSizeRejectionThreshold**：该参数用来为队列设置拒绝阀值。通过该参数，即使队列没有达到最大值也能拒绝请求。该参数主要是对LinkedBlockingQueue队列的补充，因为LinkedBlockingQueue队列的补充，因为LinkedBlockingQueue队列不能动态修改它的对象大小，而通过该属性就可以调整拒绝请求的队列大小了。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 5
+全局配置属性 | hystrix.threadPool.default.queueSizeRejectionThreshold
+实例默认值 | 通过HystrixThreadPoolProperties.Setter().withQueueSizeRejectionThreshold(int value)设置，也可通过@HystrixProperty(name="queueSizeRejectionThreshold", value="10")注解来设置
+实例配置属性 | hystrix.threadPool.HystrixThreadPoolKey.queueSizeRejectionThreshold
+
+**注意：当maxQueueSize值为-1时，该属性不会生效。**
+
+**metrics.rollingStats.timeInMilliseconds**：该参数用来设置滚动时间窗的长度，单位为ms。该滚动时间窗的长度用于线程池的指标度量，它会被分成多个桶来统计指标。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 10000
+全局配置属性 | hystrix.threadPool.default.metrics.rollingStats.timeInMilliseconds
+实例默认值 | 通过HystrixThreadPoolProperties.Setter().withMetricsRollingStatsTimeInMilliseconds(int value)设置，也可通过@HystrixProperty(name="metrics.rollingStats.timeInMilliseconds", value="10")注解来设置
+实例配置属性 | hystrix.threadPool.HystrixThreadPoolKey.metrics.rollingStats.timeInMilliseconds
+
+**metrics.rollingStats.numBuckets**：该参数用来设置滚动时间窗被划分成桶的数量。
+
+属性级别 | 默认值、配置方式、配置属性
+--- | ---
+全局默认值 | 10
+全局配置属性 | hystrix.threadPool.default.metrics.rollingStats.numBuckets
+实例默认值 | 通过HystrixThreadPoolProperties.Setter().withMetricsRollingStatsNumBuckets(int value)设置，也可通过@HystrixProperty(name="metrics.rollingStats.numBuckets", value="10")注解来设置
+实例配置属性 | hystrix.threadPool.HystrixThreadPoolKey.metrics.rollingStats.numBuckets
