@@ -15,6 +15,11 @@ public class HelloController {
     @Autowired
     private HelloService helloService;
 
+    @GetMapping("/feignHello")
+    public String hello() {
+        return helloService.hello();
+    }
+
     @GetMapping("/hello")
     public String hello(@RequestParam String name) throws InterruptedException {
         return helloService.hello(name);

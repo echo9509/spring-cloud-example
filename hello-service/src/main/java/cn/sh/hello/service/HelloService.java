@@ -20,4 +20,8 @@ public class HelloService {
         Thread.sleep(sleepTime);
         return "Hello, " + name;
     }
+
+    public String hello() {
+        return "Hello, feign consumer";
+    }
 }
