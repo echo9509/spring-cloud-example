@@ -30,6 +30,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>cn.sh.eureka</groupId>
+            <artifactId>common</artifactId>
+            <version>1.0</version>
+        </dependency>
+
     </dependencies>
 
     <build>

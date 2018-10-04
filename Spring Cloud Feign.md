@@ -11,3 +11,7 @@ Spring Cloud Feign整合了Spring Cloud Ribbon和Spring Cloud Hystrix的使用�
 **4、新增FeignConsumerController来实现对Feign客户端的调用。**
 
 **5、在application.properties中指定服务注册中心，并定义自身的服务名为feign-consumer，端口使用9001**
+
+# 参数绑定
+在进行参数绑定时，@RequestParam、@RequestHeader等可以指定参数名称的注解，但是它们的value必不可少。Spring MVC中这两个注解会根据参数名作为默认值，
+但是在Feign中绑定参数必须通过value属性来指明具体的参数名。

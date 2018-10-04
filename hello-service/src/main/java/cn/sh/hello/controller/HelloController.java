@@ -1,10 +1,9 @@
 package cn.sh.hello.controller;
 
+import cn.sh.common.entity.User;
 import cn.sh.hello.service.HelloService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * @author sh
@@ -20,8 +19,18 @@ public class HelloController {
         return helloService.hello();
     }
 
-    @GetMapping("/hello")
-    public String hello(@RequestParam String name) throws InterruptedException {
+    @GetMapping("/hello1")
+    public String hello(@RequestParam String name) {
         return helloService.hello(name);
+    }
+
+    @GetMapping("/hello2")
+    public User hello(@RequestHeader String name, @RequestHeader Integer age) {
+        return new User(name, age);
+    }
+
+    @PostMapping("/hello3")
+    public String hello(@RequestBody User user) {
+        return "Hello " + user.getName() + ", " + user.getAge();
     }
 }
