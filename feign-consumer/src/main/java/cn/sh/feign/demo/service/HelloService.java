@@ -1,15 +1,14 @@
 package cn.sh.feign.demo.service;
 
 import cn.sh.common.entity.User;
+import cn.sh.feign.demo.fallback.HelloServiceFallback;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * @author sh
  */
-@FeignClient("hello-service")
-@Service
+@FeignClient(value = "hello-service", fallback = HelloServiceFallback.class)
 public interface HelloService {
 
     @GetMapping("/feignHello")
