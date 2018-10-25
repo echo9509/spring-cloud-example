@@ -104,3 +104,58 @@ public class AccessFilter extends ZuulFilter {
 2. 与服务治理框架结合，实现自动化的服务实例维护以及负载均衡的路由转发。
 3. 实现接口权限校验与微服务业务逻辑的解耦。
 4. 通过服务网关中的过滤器，在各生命周期中去校验请求的内容，将原本在对外服务层做的校验前移，保证了微服务的无状态性，同时降低微服务的测试难度，让服务本身更集中关注业务逻辑。
+
+# 路由详解
+## 传统路由
+### 单实例配置
+单实例配置可以见前一小结
+
+### 多实例配置
+增加如下配置:
+```properties
+zuul.routes.user-service.path=/user-service/**
+zuul.routes.user-service.service-id=user-service
+ribbon.eureka.enabled=false
+user-service.ribbon.listOfServers=http://localhost:6000/,http://localhost:6001/
+```
+上述配置没有将网关服务整合进服务治理框架，因此需要实现负责均衡策略，因此需要与Spring Cloud Ribbon配合。
+
+1. ribbon.eureka.enabled：在没有整合服务治理框架式，需要将该参数设置为false，在有服务治理框架时，zuul.routes.<route>.service-id指定的是服务名称。
+2. user-service.ribbon.listOfServers：开头的user-service对应了zuul.routes.<route>.service-id中的service-id的值，上述两个参数的配置相当于在内部手工维护了服务与实例的对应关系
+
+## 服务路由配置
+面向服务的路由基本配置见上一节，除了上一节的配置，还有一种更为简洁的配置方式：**zuul.routes.<serviceId>=<path>，serviceId指定具体的服务名，path设置匹配的请求表达式。**
+
+Spring Cloud Zuul在引入Spring Cloud Eureka之后，它会为Eureka中的每个服务都自动创建一个默认路由规则，这些规则的**path默认会以serviceId作为默认前缀。**
+
+如果想禁用这个功能，可以通过zuul.ignored-services参数来设置，禁用多个服务之间用,分隔，禁用全部该参数值设置*即可。
+
+## 自定义路由映射规则
+```java
+    @Bean
+    public PatternServiceRouteMapper serviceRouteMapper() {
+        return new PatternServiceRouteMapper(
+                "(?<name>^.+)-(?<version>v.+$)", "${version}/${name}");
+    }
+```
+PatternServiceRouteMapper对象可以让开发者通过正则表达式来自定义服务与路由映射的生成关系。
+
+## 路径匹配
+在Zuul中，路由匹配的路径表达式采用了Ant风格定义。
+
+通配符 | 说明
+--- | ---
+？ | 匹配任意单个字符
+* | 匹配任意数量的字符
+** | 匹配任意数量的字符，支持多级目录
+
+当一个URL路径匹配到不同的路由的表达式，匹配结果取决于路由规则的保存顺序。注意：.properties文件是无法保证顺序的，但是.yaml可以保证顺序。
+
+## 忽略表达式
+Zuul提供了一个忽略表达式参数zuul.ignored-patterns。该参数可以用来设置不希望被API网关进行路由的URL表达式。
+
+```properties
+zuul.ignored-patterns=/**/users/**
+zuul.routes.user-service=/user-service/**
+```
+比如这时，你向网关微服务发起/user-service/users/1的请求，就会找不到该URL路径
