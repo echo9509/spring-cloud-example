@@ -16,6 +16,7 @@
         <module>common</module>
         <module>hystrix-dashboard</module>
         <module>feign-consumer</module>
+        <module>api-gateway</module>
     </modules>
     <packaging>pom</packaging>
 
