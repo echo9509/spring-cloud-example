@@ -159,3 +159,67 @@ zuul.ignored-patterns=/**/users/**
 zuul.routes.user-service=/user-service/**
 ```
 比如这时，你向网关微服务发起/user-service/users/1的请求，就会找不到该URL路径
+
+## 路由前缀
+Zuul提供了zuul.prefix参数来为全局路由规则增加前缀。**在使用该参数后，默认的前缀会失效，可以通过zuul.stripPrefix=false来关闭移除默认前缀的操作，**
+**，也可以zuul.routes.<route>.strip-prefix=true来对指定路由关闭移除代理前缀的操作。**
+
+具体解释如下图：
+![i650VU.png](https://s1.ax1x.com/2018/10/27/i650VU.png)
+
+## 本地跳转
+Zuul支持forward形式的服务端跳转，如下所示：
+```properties
+zuul.routes.api-a.path=/api-a/**
+zuul.routes.api-a.url=forward:/
+```
+注意：在网关应用中，需要有对应的接口。
+
+## Cookie与头信息
+Spring Cloud Zuul在请求路由时，会过滤掉HTTP请求头信息中的一些敏感信息，防止它们被传递到下游的服务器。
+
+默认的敏感头信息通过zuul.sensitive-headers参数定义，包括Cookie、Set-Cookie、Authorization三个属性。
+
+1. 全局默认覆盖：zuul.sensitive-headers=
+2. 对指定路由开启自定义头：zuul.routes.<route>.custom-sensitive-headers=true
+3. 将指定路由的敏感头设置唯恐：zuul.routes.<route>.sensitive-headers=
+
+# Hystrix和Ribbon支持
+Spring Cloud Zuul默认提供了Hystrix和Ribbon的支持，但是在使用path和url来设置路由时，对于路由转发的请求不会采用HystrixCommand来包装，所以
+这类路由的请求没有线程隔离和断路器的保护，并且也不会具有负载均衡的能力。
+
+1.hystrix.command.default.execution.isolation.thread.timeoutInMilliseconds
+
+该参数可以用来设置API网关中路由转发请求HystrixCommand执行的超时时间，当路由转发请求的命令执行时间超过该配置值之后，
+Hystrix会讲该执行命令标记为TIMOUT并抛出异常
+
+2.ribbon.ConnectTimeout
+
+用来创建路由转发请求连接的超时时间。
+
+当ribbon.ConnectTimeout的值小于hystrix.command.default.execution.isolation.thread.timeoutInMilliseconds值时，
+若出现路由请求创建连接超时，会自动进行重试路由请求，如果重试失败，会出现如下错误：
+![i6xEeH.png](https://s1.ax1x.com/2018/10/27/i6xEeH.png)
+
+当ribbon.ConnectTimeout的值大于hystrix.command.default.execution.isolation.thread.timeoutInMilliseconds值时，
+不会进行路由请求重试，而是直接按请求命令超时处理。
+![i6xtkn.png](https://s1.ax1x.com/2018/10/27/i6xtkn.png)
+
+3.ribbon.ReadTimeout
+
+用来设置路由转发请求的超时时间。
+
+当ribbon.ReadTimeout的值小于hystrix.command.default.execution.isolation.thread.timeoutInMilliseconds值时，
+若路由请求的处理时间超过该配置值且依赖服务的请求还未响应的时候，会自动进行请求重试。如果重试后还没有获得响应，Zuul会
+返回NUMBEROF_RETRIES_NEXTSERVER_EXCEEDED错误。
+
+当ribbon.ReadTimeout的值大于hystrix.command.default.execution.isolation.thread.timeoutInMilliseconds值时，
+若路由请求的处理时间超过该配置值且依赖服务的请求还未响应的时候，不会自动重试，而是直接返回TIMEOUT的错误信息。
+
+```properties
+zuul.retryable=false
+zuul.routes.<route>.retryable=false
+```
+上述两个参数配置分别是从全局和指定路由关闭请求重试。
+
+# 过滤器
