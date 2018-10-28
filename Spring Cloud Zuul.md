@@ -222,4 +222,77 @@ zuul.routes.<route>.retryable=false
 ```
 上述两个参数配置分别是从全局和指定路由关闭请求重试。
 
-# 过滤器
+# 过滤器详解
+## 过滤器
+过滤器主要负责对请求的处理过程进行干预，是实现请求校验、服务聚合等功能的基础。
+
+路由映射主要由pre类型的过滤器完成，它将请求路径与配置的路由规则进行匹配，以找到需要转发的目标地址。
+
+请求转发的部分则是由route类型的过滤器来完成，对pre类型过滤器获得路由地址进行转发。
+
+Spring Cloud Zuul中实现的过滤器必须包含4个基本特征：过滤类型、执行顺序、执行条件、具体操作。其实就是ZuulFilter重写的四个方法。
+
+下面主要看一下过滤器的类型：
+1. pre：可以在请求被路由之前调用
+2. routing：在路由请求时被调用
+3. post：在routing和error过滤器之后被调用
+4. error：处理请求时发生错误时被调用
+
+
+## 请求生命周期
+![icKPpT.png](https://s1.ax1x.com/2018/10/27/icKPpT.png)
+
+HTTP请求到达API网关服务时，它会进入pre，在这里被pre过滤器处理，该类型过滤器的主要目的是在进行请求路由之前做一些前置加工，比如请求的校验等。
+
+在完成了pre过滤器的处理之后，请求进入routing阶段，该阶段的主要内容是把外部请求转发到具体服务实例上去的过程，当服务实例将请求结果都返回之后，routing阶段完成。
+
+routing阶段完成之后，会进入post的阶段，在post阶段可以对处理结果进行一些加工或转换等内容。
+
+上述三个阶段发生异常时会进入error过滤器，但最终还是要流向post类型的过滤器。因为它需要通过post过滤器将最终结果返回给请求客户端。
+
+## 核心过滤器
+### pre 过滤器
+#### ServletDetectionFilter
+它的执行顺序是-3，是最先被执行的过滤器。该过滤器总是会被执行，主要用来检测当前请求是通过DispatchServlet处理运行的，还是通过ZuulServlet来处理运行的。
+检测结果会以boolean类型保存在当前请求上下文的isDispatcherServletRequest参数中。后续的过滤器中可以通过Request.isDispatcherServletRequest（）
+和RequestUtils.isZuulServletRequest()来判断请求处理的源头。一般，发送到API网关的请求都会被DispatcherServlet处理，
+除了/zuul/\*路径会被ZuulServlet处理，主要用来应对处理大文件上传的情况。另外，对于ZuulServlet的访问路径/zuul/\*，可以通过zuul.servletPath参数来进行修改。
+
+#### Servlet30WrapperFilter
+它的执行顺序是-2，是第二个执行的过滤器。目前的实现会对所有请求生效，主要为了将原始的HttpServletRequest包装成Servlet30WrapperFilter对象。
+
+#### FormBodyWrapperFilter
+它的执行顺序是-1，是第三个执行的过滤器。该过滤器只对两种类型的过滤器生效。第一类是Content-Type是application/x-www-form-urlencoded的请求，
+第二类是Content-Type为multipart/form-data并且是由Spring的DispatcherServlet处理的请求(用到了ServletDetectionFilter的处理结果)。该过滤器
+的主要目的是将符合要求的请求体包装成FormBodyRequestWrapper对象。
+
+#### DebugFilter
+执行顺序1，是第四个执行的过滤器。该过滤器会根据配置参数zuul.debug.request和请求中的debug参数来决定是否执行过滤器中的操作。它的具体操作内容是
+将当前请求上下文中的debugRouting和debugRequest参数设置为true。另外对于请求参数中debug参数，可以通过zuul.debug.parameter来进行定义。
+
+#### PreDecorationFilter
+执行顺序是5，是pre阶段最后被执行的过滤器。该过滤器会判断当前请求上下文中是否存在forward.to和serviceId参数。如果都不存在，那么会执行具体过滤器的操作。
+它的具体操作是为当前请求做一些预处理，比如：进行路由规则的匹配、在请求上下文中设置该请求的基本信息以及将路由匹配结果等一些设置信息等。在后续过滤器中，
+可以通过RequestContext.getCurrentContext()来访问这些信息。另外，在该过滤器的实现中，还包括HTTP头请求处理的逻辑。对于头域的记录是通过
+zuul.addProxyHeaders参数进行控制的，这个参数的默认值为true，zuul在请求跳转时默认会为请求增加x-Forwarded-*头域。
+
+### routing过滤器
+#### RibbonRoutingFilter
+执行顺序是10，是route阶段第一个执行的过滤器。该过滤器只对请求上下文中存在serviceId参数的请求进行处理，即只对通过serviceId配置路由规则的请求生效。
+该过滤器的执行逻辑就是面向服务路由的核心，通过使用Ribbon和Hystrix来向服务实例发起请求，并将服务实例的请求结果返回。
+
+#### SimpleHostRoutingFilter
+执行顺序100，是route阶段第二个执行的过滤器。该过滤器只对请求上下文中存在routeHost参数的请求进行处理，即只对通过url配置路由规则的请求生效。
+
+#### SendForwardFilter
+执行顺序是500，是route阶段第三个执行的过滤器。该过滤器只对请求上下文中存在forward.to参数的请求进行处理，即用来处理路由规则中的forward本地跳转配置。
+
+### post过滤器
+#### SendErrorFilter
+执行顺序为0，是post阶段的第一个过滤器。该过滤器仅在请求上下文包含error.status_code参数并且还没有被该过滤器处理过的时候执行。
+该过滤器的具体逻辑利用请求上下文中的错误信息组成一个forward到API网关/error错误端点的请求来产生错误响应
+
+#### SendResponseFilter
+执行顺序是1000，是post阶段最后执行的过滤器。该过滤器会检查请求上下文中是否包含请求响应相关的头信息、响应数据流或是响应体，
+只有在包含它们其中一个的时候执行处理逻辑。该过滤器的处理逻辑就是利用请求上下文的响应信息来组织需要发送回客户端的响应内容。
+![ig9ZLT.png](https://s1.ax1x.com/2018/10/28/ig9ZLT.png)
