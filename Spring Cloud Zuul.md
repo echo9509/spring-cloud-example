@@ -251,6 +251,9 @@ routing阶段完成之后，会进入post的阶段，在post阶段可以对处�
 上述三个阶段发生异常时会进入error过滤器，但最终还是要流向post类型的过滤器。因为它需要通过post过滤器将最终结果返回给请求客户端。
 
 ## 核心过滤器
+
+![ig9ZLT.png](https://s1.ax1x.com/2018/10/28/ig9ZLT.png)
+
 ### pre 过滤器
 #### ServletDetectionFilter
 它的执行顺序是-3，是最先被执行的过滤器。该过滤器总是会被执行，主要用来检测当前请求是通过DispatchServlet处理运行的，还是通过ZuulServlet来处理运行的。
@@ -295,4 +298,17 @@ zuul.addProxyHeaders参数进行控制的，这个参数的默认值为true，zu
 #### SendResponseFilter
 执行顺序是1000，是post阶段最后执行的过滤器。该过滤器会检查请求上下文中是否包含请求响应相关的头信息、响应数据流或是响应体，
 只有在包含它们其中一个的时候执行处理逻辑。该过滤器的处理逻辑就是利用请求上下文的响应信息来组织需要发送回客户端的响应内容。
-![ig9ZLT.png](https://s1.ax1x.com/2018/10/28/ig9ZLT.png)
+
+## 异常处理(有待考证)
+一般核心过滤器都会在具体的执行逻辑中进行try-catch，然后在异常处理时向请求上下文中添加一些error相关的参数，主要有下面几个：
+1. error.status_code：错误编码
+2. error.exception：Exception异常对象
+3. error.message：错误信息
+
+**上述有待考证**
+
+### error过滤器
+即使使用try-catch，我们的程序依然有可能抛出异常，因此会进入error阶段。
+
+## 禁用过滤器
+zuul.<SimpleClassName>.<filterType>.disable=true 可以禁用指定的过滤器
